@@ -1,4 +1,8 @@
-import pyaudio
+try:
+    import pyaudio
+    PYAUDIO_AVAILABLE = True
+except ImportError:
+    PYAUDIO_AVAILABLE = False
 import numpy as np
 import time
 import os
@@ -8,13 +12,24 @@ class Ear:
         self.threshold = threshold
         self.chunk_size = chunk_size
         self.rate = rate
-        self.p = pyaudio.PyAudio()
+        if PYAUDIO_AVAILABLE:
+            try:
+                self.p = pyaudio.PyAudio()
+            except:
+                self.p = None
+        else:
+            self.p = None
         self.stream = None
         self.last_clap_time = 0
         self.double_clap_window = (0.1, 1.0) # seconds
 
     def start_listening(self, on_wake_callback):
         """Starts the audio stream and listens for claps."""
+        if not self.p:
+            print("[!] Ear Warning: PyAudio or Microphone not available.")
+            self._start_mock_listener(on_wake_callback)
+            return
+
         try:
             self.stream = self.p.open(
                 format=pyaudio.paInt16,

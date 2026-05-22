@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  easy-jarvis:
+    build: .
+    container_name: easy-jarvis
+    env_file: .env
+    volumes:
+      - .:/app
+      - ./memory:/app/memory
+    stdin_open: true # Allows interactive input
+    tty: true        # Allows interactive input
+    restart: unless-stopped
