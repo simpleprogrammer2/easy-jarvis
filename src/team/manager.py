@@ -138,8 +138,8 @@ class TeamManager:
                 print(f"[*] Pushing {self.branch_name} to GitHub...")
                 subprocess.run(["git", "push", "origin", self.branch_name], check=True)
                 
-                print(f"🚀 MISSION UPLOADED! Check your branches: https://github.com/simpleprogrammer2/easy-jarvis/branches")
-                self.notifier.send_alert("Mission Uploaded", f"Jarvis has completed '{mission_name}'. Review the PR here: https://github.com/simpleprogrammer2/easy-jarvis/compare/{self.branch_name}")
+                # Create Pull Request via GitHub REST API
+                self._create_github_pr(mission_name)
                 
                 # Switch back to main for next cycle
                 subprocess.run(["git", "checkout", "main"], check=True)
@@ -147,6 +147,49 @@ class TeamManager:
                 print("[*] No changes were made by the team. Skipping push.")
         except Exception as e:
             print(f"[!] Team Push Error: {e}")
+
+    def _create_github_pr(self, mission_name):
+        """Creates a Pull Request using the GitHub REST API."""
+        token = os.getenv("GITHUB_TOKEN")
+        if not token:
+            print("[!] PR Error: GITHUB_TOKEN not set.")
+            return
+
+        # Get repo owner and name from git remote
+        try:
+            remote_info = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
+            url = remote_info.stdout.strip()
+            # Handle both https and ssh formats
+            repo_path = url.split("github.com/")[1].replace(".git", "")
+            owner, repo = repo_path.split("/")
+            if ":" in owner: owner = owner.split(":")[-1] # Handle x-access-token format
+        except Exception as e:
+            print(f"[!] PR Error parsing remote: {e}")
+            return
+
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        data = {
+            "title": f"🤖 Evolution: {mission_name}",
+            "body": f"This PR was generated autonomously by JARVIS.\n\n**Mission:** {mission_name}\n**Status:** Built and Verified locally.",
+            "head": self.branch_name,
+            "base": "main"
+        }
+
+        try:
+            print(f"[*] Creating Pull Request for {self.branch_name}...")
+            response = requests.post(api_url, headers=headers, json=data)
+            if response.status_code == 201:
+                pr_url = response.json().get("html_url")
+                print(f"🚀 PULL REQUEST CREATED: {pr_url}")
+                self.notifier.send_alert("PR Created", f"Jarvis has completed '{mission_name}'. Review the PR here: {pr_url}")
+            else:
+                print(f"[!] PR Failed ({response.status_code}): {response.text}")
+        except Exception as e:
+            print(f"[!] PR API Error: {e}")
 
 if __name__ == "__main__":
     manager = TeamManager()
