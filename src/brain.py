@@ -2,6 +2,8 @@ import os
 import requests
 import json
 import asyncio
+import logging
+from typing import Dict
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -12,6 +14,7 @@ class Brain:
     def __init__(self, mode="local"):
         self.mode = mode # "local" or "gemini"
         self.local_url = os.getenv("LOCAL_LLM_URL", "http://local-llm:8080/v1/chat/completions")
+        self.memory: Dict = {}
         
         # System instructions
         self.system_prompt = """
@@ -44,6 +47,12 @@ class Brain:
 
         self.history = []
         self.max_history = 10
+
+    def store_memory(self, key: str, value: any):
+        self.memory[key] = value
+
+    def retrieve_memory(self, key: str) -> any:
+        return self.memory.get(key)
 
     def _is_important(self, text: str) -> bool:
         """Heuristic to determine if a question is 'important' enough for Gemini."""
