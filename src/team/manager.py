@@ -63,7 +63,15 @@ class TeamManager:
         executor = Executor()
         
         print(f"\n>>> [{role}] Thinking: {task_description}")
-        persona_prompt = f"ACT AS: {self.roles[role]}\nTASK: {task_description}\n\nIMPORTANT: Use shell commands (e.g. 'cat > file.py <<EOF...') to save your work."
+        persona_prompt = f"""
+        ACT AS: {self.roles[role]}
+        TASK: {task_description}
+        
+        CRITICAL: You are in AUTONOMOUS MODE. 
+        - If you write code, YOU MUST provide a shell command to save it (e.g., 'cat > filename.py <<EOF...').
+        - Do not just talk about code. WRITE it to the disk.
+        - Ensure your JSON 'command' field is populated with the save command.
+        """
         
         try:
             ai_response = await self.brain.process_command(persona_prompt)
@@ -101,6 +109,16 @@ class TeamManager:
 
     def _prepare_branch(self):
         try:
+            # Inject GITHUB_TOKEN into remote URL for authentication
+            token = os.getenv("GITHUB_TOKEN")
+            if token:
+                remote_info = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
+                current_url = remote_info.stdout.strip()
+                if "github.com" in current_url and "@github.com" not in current_url:
+                    new_url = current_url.replace("https://github.com/", f"https://x-access-token:{token}@github.com/")
+                    subprocess.run(["git", "remote", "set-url", "origin", new_url], check=True)
+                    print("[+] GITHUB_TOKEN injected into remote URL.")
+
             subprocess.run(["git", "checkout", "main"], check=True)
             subprocess.run(["git", "pull", "origin", "main"], check=True)
             subprocess.run(["git", "checkout", "-b", self.branch_name], check=True)
