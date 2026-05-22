@@ -169,8 +169,7 @@ class TeamManager:
             # Handle both https and ssh formats
             repo_path = url.split("github.com/")[1].replace(".git", "")
             owner, repo = repo_path.split("/")
-            if ":" in owner:
-                owner = owner.split(":")[-1] # Handle x-access-token format
+            if ":" in owner: owner = owner.split(":")[-1] # Handle x-access-token format
         except Exception as e:
             print(f"[!] PR Error parsing remote: {e}")
             return
