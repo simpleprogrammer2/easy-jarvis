@@ -1,11 +1,13 @@
 pytest
+pytest-asyncio
 ruff
 pyaudio
 numpy
 edge-tts
 asyncio
+python-dotenv
+google-generativeai
 fastapi
 uvicorn[standard]
 jinja2
-python-dotenv
-google-generativeai
+python-multipart

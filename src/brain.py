@@ -48,14 +48,21 @@ class Brain:
                 generation_config={"response_mime_type": "application/json"}
             )
             
+            # Robust JSON cleaning
+            raw_text = response.text.strip()
+            if "```json" in raw_text:
+                raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw_text:
+                raw_text = raw_text.split("```")[1].split("```")[0].strip()
+            
             import json
-            return json.loads(response.text)
+            return json.loads(raw_text)
         except Exception as e:
             print(f"[!] Brain Error: {e}")
             return {
                 "speech": "I've hit a slight cognitive snag. Could you rephrase?",
                 "command": None,
-                "thought": str(e)
+                "thought": f"JSON Parsing or API Error: {str(e)}"
             }
 
 if __name__ == "__main__":

@@ -52,8 +52,8 @@ async def chat_endpoint(payload: dict = Body(...)):
     # 1. Brain Reasoning
     ai_response = await brain.process_command(user_input)
     
-    # 2. Vocal Feedback (Optional background task)
-    # asyncio.create_task(voice.speak(ai_response['speech']))
+    # 2. Vocal Feedback (Run in background to avoid blocking the JSON response)
+    asyncio.create_task(voice.speak(ai_response['speech']))
     
     return JSONResponse(content=ai_response)
 

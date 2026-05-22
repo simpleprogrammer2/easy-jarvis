@@ -16,3 +16,18 @@ This document defines the foundational mandates for development and maintenance 
 ## 🏗 Infrastructure
 - **System Dependencies**: Any change requiring new system-level libraries (e.g., audio drivers) must be reflected in both `Dockerfile` and `.github/workflows/main.yml`.
 - **Mocking**: For modules that interact with hardware (Ear, Voice), ensure a robust "Mock" fallback exists for CI and remote execution environments.
+
+## 🌙 Docker Overnight Teammate (Night-Shift)
+The project includes a local "Night-Shift" runner designed to act as your autonomous teammate.
+- **Schedule**: Runs from **11 PM (23:00)** to **8 AM (08:00)** daily.
+- **Service**: `teammate` in `docker-compose.yml`.
+- **Workflow**: 
+    1. Reads `BACKLOG.md` for prioritized tasks.
+    2. Synchronizes with `origin/main`.
+    3. Implements features/tests autonomously.
+    4. Validates the build with `pytest`.
+    5. Commits and pushes changes directly from the container.
+- **Setup**: 
+    1. Ensure `GEMINI_API_KEY` is in your `.env`.
+    2. Start the teammate: `docker-compose up -d teammate`.
+    3. Monitor logs: `docker logs -f easy-jarvis-teammate`.

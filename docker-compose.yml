@@ -10,8 +10,19 @@ services:
     volumes:
       - .:/app
       - ./memory:/app/memory
-    stdin_open: true # Allows interactive input
-    tty: true        # Allows interactive input
+    stdin_open: true 
+    tty: true        
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  teammate:
+    build: .
+    container_name: easy-jarvis-teammate
+    env_file: .env
+    volumes:
+      - .:/app
+    command: ["python3", "src/scripts/night_shift.py"]
+    restart: unless-stopped
+    depends_on:
+      - easy-jarvis
