@@ -11,7 +11,7 @@ class Brain:
             raise ValueError("GEMINI_API_KEY not found in environment.")
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('models/gemini-1.5-flash')
+        self.model = genai.GenerativeModel('models/gemini-flash-latest')
         
         self.system_prompt = """
         You are 'easy-jarvis', a Kind, Teacher-like, and Funny autonomous assistant for 'simpleprogrammer'.
