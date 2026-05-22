@@ -33,14 +33,19 @@ class EasyJarvis:
         self.is_active = True
         
         print("\n🍱 easy-jarvis: Session Started.")
-        print("[*] Transcript Mode: Monitoring 'transcript.txt' for commands...")
-        await self.voice.speak("I am awake and monitoring the transcript. How can I help you build today?")
+        print("[*] Chat Mode: Active. Monitoring 'transcript.txt' for commands...")
+        print("[*] Chat Log: Reading/Writing to 'chat_log.md' (Read-only for you)")
+        await self.voice.speak("I am awake and ready to chat. How can I help you build today?")
         
         transcript_file = "transcript.txt"
+        chat_log_file = "chat_log.md"
         
-        # Ensure file exists
+        # Initialize files
         if not os.path.exists(transcript_file):
             with open(transcript_file, 'w') as f: f.write("")
+        
+        with open(chat_log_file, 'w') as f:
+            f.write("# 🍱 easy-jarvis: Active Chat Log\n\n*This log is updated autonomously in real-time.*\n\n---\n")
 
         # Command loop (Monitoring File)
         while True:
@@ -52,22 +57,32 @@ class EasyJarvis:
                     # Clear the transcript file immediately after reading
                     with open(transcript_file, 'w') as f: f.write("")
                     
-                    print(f"\n>>> [Transcript Captured]: {user_text}")
+                    print(f"\n>>> [User]: {user_text}")
                     
                     if user_text.lower() in ["sleep", "exit", "quit"]:
-                        await self.voice.speak("Understood. Systems standing by.")
+                        await self.voice.speak("Understood. I'm taking a nap. Goodbye.")
                         break
                         
-                    # 1. Brain Reasoning
+                    # 1. Brain Reasoning (Multi-turn)
                     ai_response = await self.brain.process_command(user_text)
                     
-                    # 2. Speak Thought/Safety Warning
-                    print(f"[*] Thoughts: {ai_response['thought']}")
+                    # 2. Update Chat Log (Read-only for user)
+                    with open(chat_log_file, 'a') as f:
+                        f.write(f"### 👤 User: {user_text}\n")
+                        f.write(f"> **🧠 JARVIS Thoughts:** {ai_response['thought']}\n\n")
+                        f.write(f"**🍱 JARVIS:** {ai_response['speech']}\n\n")
+                        if ai_response['command']:
+                            f.write(f"```bash\n# Executing: {ai_response['command']}\n```\n")
+                        f.write("---\n")
+
+                    # 3. Speak Response
                     await self.voice.speak(ai_response['speech'])
                     
-                    # 3. Execute Command (if provided)
+                    # 4. Execute Command (if provided)
                     if ai_response['command']:
                         output = self.executor.execute(ai_response['command'])
+                        with open(chat_log_file, 'a') as f:
+                            f.write(f"**📟 Terminal Output:**\n```text\n{output}\n```\n\n---\n")
                         print(f"\n--- Terminal Output ---\n{output}\n")
                 
                 # Small sleep to prevent high CPU usage

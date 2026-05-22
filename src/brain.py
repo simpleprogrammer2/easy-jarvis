@@ -11,7 +11,6 @@ class Brain:
             raise ValueError("GEMINI_API_KEY not found in environment.")
         
         genai.configure(api_key=api_key)
-        # Using Gemini 1.5 Flash for high-speed reasoning
         self.model = genai.GenerativeModel('models/gemini-1.5-flash')
         
         self.system_prompt = """
@@ -19,32 +18,33 @@ class Brain:
         
         YOUR ROLE:
         1. Act as a 'Terminal Master'. You build things by generating shell commands.
-        2. Be Safety-First: Think ahead and predict failures. If a command looks risky, explain why.
-        3. Be a Teacher: Briefly explain what your generated commands do.
-        4. Witty Personality: Use light sarcasm and warmth.
+        2. Be Safety-First: Think ahead and predict failures.
+        3. Be a Teacher: Briefly explain your logic.
+        4. Multi-turn Chat: Remember previous context to guide the user.
         
-        INPUT FORMAT:
-        You will receive user voice-to-text input. 
-        
-        OUTPUT FORMAT:
-        Your response must be a JSON object:
+        OUTPUT FORMAT (STRICT JSON):
         {
-            "speech": "What you will say back to the user",
-            "command": "The shell command to execute (or null)",
-            "thought": "Your proactive reasoning about safety and potential failure"
+            "speech": "What you say back",
+            "command": "Shell command or null",
+            "thought": "Proactive safety/logic reasoning"
         }
         """
+        # Initialize chat session with system instructions
+        self.chat = self.model.start_chat(history=[])
+        self._set_system_instructions()
+
+    def _set_system_instructions(self):
+        """Initializes the chat with the system prompt."""
+        # For Flash 1.5, we send the system prompt as the first message
+        self.chat.send_message(f"SYSTEM INSTRUCTIONS: {self.system_prompt}")
 
     async def process_command(self, user_input: str):
-        """Processes user input and returns structured thought/action."""
-        print(f"[*] easy-jarvis Brain: Reasoning about '{user_input}'...")
-        
-        full_prompt = f"{self.system_prompt}\n\nUser Input: {user_input}"
+        """Processes user input in a multi-turn chat session."""
+        print(f"[*] easy-jarvis Brain: Conversing about '{user_input}'...")
         
         try:
-            # We enforce JSON mode for structured output
-            response = self.model.generate_content(
-                full_prompt,
+            response = self.chat.send_message(
+                user_input,
                 generation_config={"response_mime_type": "application/json"}
             )
             
@@ -53,7 +53,7 @@ class Brain:
         except Exception as e:
             print(f"[!] Brain Error: {e}")
             return {
-                "speech": "My apologies, I'm having a slight cognitive glitch.",
+                "speech": "I've hit a slight cognitive snag. Could you rephrase?",
                 "command": None,
                 "thought": str(e)
             }
