@@ -1,2 +1,6 @@
 pytest
 ruff
+pyaudio
+numpy
+edge-tts
+asyncio
