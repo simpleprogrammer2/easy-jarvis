@@ -16,20 +16,20 @@ class EasyJarvis:
         self.is_active = False
 
     async def on_wake(self):
-        """Logic for when JARVIS is woken up by a double-clap."""
-        if self.is_active: return
+        """Auto-wake logic for immediate startup."""
+        if self.is_active:
+            return
         self.is_active = True
         
         print("\n🍱 easy-jarvis: Session Started.")
-        await self.voice.speak("I'm here. How can I help you build today?")
+        await self.voice.speak("I am awake. How can I help you build today?")
         
-        # In this skeleton, we'll use input() as a placeholder for Whisper STT
-        # This allows you to test the Brain/Executor loop via typing for now.
+        # Command loop
         while True:
-            user_text = input("\n>>> [Voice Mock] Speak to JARVIS (or type 'sleep'): ")
+            user_text = input("\n>>> [Voice Mock] Speak to JARVIS (or type 'exit'): ")
             
             if user_text.lower() in ["sleep", "exit", "quit"]:
-                await self.voice.speak("Understood. I'm going back to sleep. Just double-clap if you need me.")
+                await self.voice.speak("Understood. Systems standing by.")
                 break
                 
             # 1. Brain Reasoning
@@ -47,12 +47,8 @@ class EasyJarvis:
         self.is_active = False
 
     def run(self):
-        print("🍱 easy-jarvis: Systems Online. Monitoring for claps...")
-        # Since start_listening is blocking, we wrap on_wake in a runner
-        def wake_wrapper():
-            asyncio.run(self.on_wake())
-            
-        self.ear.start_listening(wake_wrapper)
+        print("🍱 easy-jarvis: Systems Online. Initializing Auto-Wake...")
+        asyncio.run(self.on_wake())
 
 if __name__ == "__main__":
     jarvis = EasyJarvis()

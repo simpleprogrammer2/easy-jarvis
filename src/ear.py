@@ -15,7 +15,7 @@ class Ear:
         if PYAUDIO_AVAILABLE:
             try:
                 self.p = pyaudio.PyAudio()
-            except:
+            except Exception:
                 self.p = None
         else:
             self.p = None
@@ -72,7 +72,8 @@ class Ear:
         """Fallback listener that uses a file trigger for testing."""
         print("[!] Falling back to MOCK EAR. Use 'touch wake.trigger' to wake easy-jarvis.")
         trigger_file = "wake.trigger"
-        if os.path.exists(trigger_file): os.remove(trigger_file)
+        if os.path.exists(trigger_file):
+            os.remove(trigger_file)
         
         while True:
             if os.path.exists(trigger_file):
