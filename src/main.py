@@ -1,15 +1,19 @@
 import asyncio
 import os
 import sys
+import json
+import uvicorn
+from fastapi import FastAPI, Request, Form, HTTPException, Body
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 # Handle module path for robust execution
 try:
-    from src.ear import Ear
     from src.voice import Voice
     from src.brain import Brain
     from src.executor import Executor
 except ImportError:
-    from ear import Ear
     from voice import Voice
     from brain import Brain
     from executor import Executor
@@ -18,86 +22,62 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class EasyJarvis:
-    def __init__(self):
-        self.ear = Ear(threshold=3000)
-        self.voice = Voice()
-        self.brain = Brain()
-        self.executor = Executor()
-        self.is_active = False
+app = FastAPI(title="easy-jarvis Console")
 
-    async def on_wake(self):
-        """Auto-wake logic for immediate startup."""
-        if self.is_active:
-            return
-        self.is_active = True
-        
-        print("\n🍱 easy-jarvis: Session Started.")
-        print("[*] Chat Mode: Active. Monitoring 'transcript.txt' for commands...")
-        print("[*] Chat Log: Reading/Writing to 'chat_log.md' (Read-only for you)")
-        await self.voice.speak("I am awake and ready to chat. How can I help you build today?")
-        
-        transcript_file = "transcript.txt"
-        chat_log_file = "chat_log.md"
-        
-        # Initialize files
-        if not os.path.exists(transcript_file):
-            with open(transcript_file, 'w') as f: f.write("")
-        
-        with open(chat_log_file, 'w') as f:
-            f.write("# 🍱 easy-jarvis: Active Chat Log\n\n*This log is updated autonomously in real-time.*\n\n---\n")
+# --- Globals ---
+brain = Brain()
+executor = Executor()
+voice = Voice()
 
-        # Command loop (Monitoring File)
-        while True:
-            try:
-                with open(transcript_file, 'r') as f:
-                    user_text = f.read().strip()
-                
-                if user_text:
-                    # Clear the transcript file immediately after reading
-                    with open(transcript_file, 'w') as f: f.write("")
-                    
-                    print(f"\n>>> [User]: {user_text}")
-                    
-                    if user_text.lower() in ["sleep", "exit", "quit"]:
-                        await self.voice.speak("Understood. I'm taking a nap. Goodbye.")
-                        break
-                        
-                    # 1. Brain Reasoning (Multi-turn)
-                    ai_response = await self.brain.process_command(user_text)
-                    
-                    # 2. Update Chat Log (Read-only for user)
-                    with open(chat_log_file, 'a') as f:
-                        f.write(f"### 👤 User: {user_text}\n")
-                        f.write(f"> **🧠 JARVIS Thoughts:** {ai_response['thought']}\n\n")
-                        f.write(f"**🍱 JARVIS:** {ai_response['speech']}\n\n")
-                        if ai_response['command']:
-                            f.write(f"```bash\n# Executing: {ai_response['command']}\n```\n")
-                        f.write("---\n")
+# Handle template directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(current_dir, "templates"))
 
-                    # 3. Speak Response
-                    await self.voice.speak(ai_response['speech'])
-                    
-                    # 4. Execute Command (if provided)
-                    if ai_response['command']:
-                        output = self.executor.execute(ai_response['command'])
-                        with open(chat_log_file, 'a') as f:
-                            f.write(f"**📟 Terminal Output:**\n```text\n{output}\n```\n\n---\n")
-                        print(f"\n--- Terminal Output ---\n{output}\n")
-                
-                # Small sleep to prevent high CPU usage
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                print(f"[!] Transcript Error: {e}")
-                await asyncio.sleep(2)
-                
-        self.is_active = False
+# --- API Endpoints ---
 
-    def run(self):
-        print("🍱 easy-jarvis: Systems Online. Initializing Auto-Wake...")
-        asyncio.run(self.on_wake())
+@app.get("/", response_class=HTMLResponse)
+async def get_console(request: Request):
+    return templates.TemplateResponse(
+        request=request, 
+        name="console.html", 
+        context={"status": "Online"}
+    )
+
+@app.post("/chat")
+async def chat_endpoint(payload: dict = Body(...)):
+    user_input = payload.get("text")
+    if not user_input:
+        raise HTTPException(status_code=400, detail="No input provided")
+    
+    # 1. Brain Reasoning
+    ai_response = await brain.process_command(user_input)
+    
+    # 2. Vocal Feedback (Optional background task)
+    # asyncio.create_task(voice.speak(ai_response['speech']))
+    
+    return JSONResponse(content=ai_response)
+
+@app.post("/execute")
+async def execute_endpoint(payload: dict = Body(...)):
+    command = payload.get("command")
+    if not command:
+        raise HTTPException(status_code=400, detail="No command provided")
+    
+    # 1. Execute via the Terminal Master
+    output = executor.execute(command)
+    
+    return JSONResponse(content={"output": output})
+
+@app.get("/health")
+async def health():
+    return {"status": "JARVIS Systems Active"}
+
+# --- Main Entry ---
+
+def run_server():
+    port = int(os.getenv("PORT", 8000))
+    print(f"🍱 easy-jarvis: Cinematic Console starting on port {port}...")
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    jarvis = EasyJarvis()
-    jarvis.run()
+    run_server()

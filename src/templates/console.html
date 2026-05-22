@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>easy-jarvis | Cinematic Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bumble-yellow: #FFD200;
+            --stark-blue: #00D2FF;
+            --dark-bg: #0A0A0B;
+            --hud-glow: rgba(255, 210, 0, 0.1);
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--dark-bg);
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Scan-line HUD Overlay --- */
+        body::before {
+            content: " ";
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+
+        /* --- Header & Arc Reactor --- */
+        .header {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 210, 0, 0.2);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .arc-reactor {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--bumble-yellow) 20%, transparent 70%);
+            box-shadow: 0 0 20px var(--bumble-yellow);
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--bumble-yellow); }
+            50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--bumble-yellow); }
+            100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--bumble-yellow); }
+        }
+
+        /* --- Chat Feed --- */
+        .chat-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scrollbar-width: thin;
+        }
+
+        .hologram-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 210, 0, 0.15);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+            max-width: 80%;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .thought-bubble {
+            font-size: 11px;
+            color: var(--bumble-yellow);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            opacity: 0.7;
+        }
+
+        /* --- Footer & Input --- */
+        .footer {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-top: 1px solid rgba(255, 210, 0, 0.1);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        input {
+            flex-grow: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 210, 0, 0.3);
+            border-radius: 30px;
+            padding: 15px 25px;
+            color: white;
+            font-family: inherit;
+            font-size: 16px;
+            outline: none;
+        }
+
+        input:focus { border-color: var(--bumble-yellow); background: rgba(255, 255, 255, 0.08); }
+
+        .btn-send {
+            background: var(--bumble-yellow);
+            color: var(--dark-bg);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn-send:active { transform: scale(0.9); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <div style="font-weight: 700; font-size: 18px; letter-spacing: 2px;">EASY-JARVIS</div>
+            <div style="font-size: 10px; color: var(--bumble-yellow);">SYSTEM STATUS: ONLINE</div>
+        </div>
+        <div class="arc-reactor"></div>
+    </div>
+
+    <div class="chat-container" id="chat-feed">
+        <div class="hologram-card">
+            <div class="thought-bubble">Startup sequence complete</div>
+            I am awake, simpleprogrammer. How can I help you build today?
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="input-group">
+            <input type="text" id="user-input" placeholder="Type a command or ask a question...">
+            <button class="btn-send" onclick="sendChat()">🚀</button>
+        </div>
+    </div>
+
+    <script>
+        async function sendChat() {
+            const input = document.getElementById('user-input');
+            const text = input.value;
+            if (!text) return;
+            
+            appendMessage('USER', text);
+            input.value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+                
+                const data = await response.json();
+                appendMessage('JARVIS', data.speech, data.thought, data.command);
+            } catch (e) {
+                appendMessage('SYSTEM', 'Link to brain severed.');
+            }
+        }
+
+        function appendMessage(role, text, thought = '', command = '') {
+            const feed = document.getElementById('chat-feed');
+            const card = document.createElement('div');
+            card.className = 'hologram-card';
+            if (role === 'USER') card.style.alignSelf = 'flex-end';
+            
+            let html = '';
+            if (thought) html += `<div class="thought-bubble">🧠 ${thought}</div>`;
+            html += `<div>${text}</div>`;
+            
+            if (command) {
+                html += `<div style="margin-top: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-family: monospace; font-size: 12px; border: 1px dashed var(--bumble-yellow);">
+                            # PROPOSED COMMAND:<br>${command}
+                         </div>
+                         <button onclick="executeCommand('${command}')" style="margin-top: 10px; background: var(--bumble-yellow); border: none; padding: 5px 15px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 12px;">EXECUTE</button>`;
+            }
+            
+            card.innerHTML = html;
+            feed.appendChild(card);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        async function executeCommand(cmd) {
+            try {
+                const response = await fetch('/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                });
+                const data = await response.json();
+                appendMessage('SYSTEM', 'Execution Output:', '', data.output);
+            } catch (e) {
+                appendMessage('SYSTEM', 'Execution failed.');
+            }
+        }
+
+        // Enter key listener
+        document.getElementById('user-input').addEventListener('keypress', e => e.key === 'Enter' && sendChat());
+    </script>
+</body>
+</html>

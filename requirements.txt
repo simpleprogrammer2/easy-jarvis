@@ -4,3 +4,8 @@ pyaudio
 numpy
 edge-tts
 asyncio
+fastapi
+uvicorn[standard]
+jinja2
+python-dotenv
+google-generativeai
