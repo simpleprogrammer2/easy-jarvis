@@ -4,6 +4,7 @@ This backlog is used by the **Night-Shift Autonomous Teammate** to prioritize ov
 
 ## 🔴 Priority: High
 - [x] **Logging Refactor**: Moved `Ear` module to structured `logging`. (Ongoing for other modules)
+- [ ] **Morning Report**: [Leader] Generate a `MORNING_REPORT.md` summarizing the night's work and build status.
 - [ ] **Test Coverage**: Add unit tests for `src/voice.py` (using mocks for `edge-tts`).
 
 ## 🟡 Priority: Medium
