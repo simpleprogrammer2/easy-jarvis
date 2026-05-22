@@ -45,12 +45,12 @@ def main():
     while True:
         if is_within_working_hours():
             run_autonomous_cycle()
-            # After a cycle, sleep for a while to avoid tight loops
-            print(f"[*] Cycle complete. Resting for 30 minutes...")
-            time.sleep(1800) 
+            # Cooldown between task groups to manage API tokens and prevent runaway loops
+            print(f"[*] Task group complete. Standing by for next assignment in 5 minutes...")
+            time.sleep(300) 
         else:
-            # Check back in a minute
-            time.sleep(CHECK_INTERVAL)
+            # Outside of working hours, check once every 10 minutes
+            time.sleep(600)
 
 if __name__ == "__main__":
     main()
