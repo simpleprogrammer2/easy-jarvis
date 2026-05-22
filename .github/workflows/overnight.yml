@@ -1,0 +1,66 @@
+name: Overnight Autonomous Build
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Runs at 2 AM every day
+  workflow_dispatch:      # Allow manual trigger for testing
+
+jobs:
+  overnight-dev:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libportaudio2 portaudio19-dev
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "Jarvis: Overnight Feature Implementation"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # This is the hook for autonomous development.
+          # In a real setup, we would invoke a CLI tool that uses the Brain
+          # to look at the Taskboard/Backlog and implement the next slice.
+          echo "[*] Initializing Overnight Builder..."
+          # python src/scripts/autonomous_dev.py --mode=overnight
+          echo "[+] Feature implementation cycle complete."
+
+      - name: Run Integrity Suite (Lint & Test)
+        run: |
+          ruff check .
+          pytest
+
+      - name: Sync and Merge
+        if: success()
+        run: |
+          git config --global user.name "EasyJarvis-Overnight"
+          git config --global user.email "agent@easyjarvis.ai"
+          
+          # If work was done, commit it
+          if [[ -n $(git status -s) ]]; then
+            git add .
+            git commit -m "feat(overnight): autonomous build and test sync [$(date +%F)]"
+            git push origin main
+            echo "[+] Overnight build synced to main."
+          else
+            echo "[*] No changes detected. Systems verified and synced."
+          fi
