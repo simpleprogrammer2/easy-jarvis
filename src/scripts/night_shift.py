@@ -1,18 +1,23 @@
 import time
 import datetime
+from zoneinfo import ZoneInfo
 import subprocess
 import os
 import sys
+import asyncio
 
 from src.team.manager import TeamManager
 
 # Configuration for the Night Shift
 START_HOUR = 23  # 11 PM
 END_HOUR = 8     # 8 AM
+TIMEZONE = "America/Chicago" # CST/CDT
 CHECK_INTERVAL = 60 # Check every minute
 
 def is_within_working_hours():
-    now = datetime.datetime.now()
+    # Enforce CST timezone
+    tz = ZoneInfo(TIMEZONE)
+    now = datetime.datetime.now(tz)
     current_hour = now.hour
     
     if START_HOUR > END_HOUR:
@@ -24,8 +29,12 @@ def is_within_working_hours():
 
 def run_autonomous_cycle():
     """The core loop for the overnight teammate team."""
+    tz = ZoneInfo(TIMEZONE)
+    now = datetime.datetime.now(tz)
+    print(f"[{now.strftime('%Y-%m-%d %H:%M:%S %Z')}] 🌙 Night-Shift: Starting autonomous cycle...")
     team = TeamManager()
-    team.start_shift()
+    # Note: start_shift is async, so we need to run it in a loop or await it
+    asyncio.run(team.start_shift())
 
 def _setup_git():
     """Ensures git is configured inside the container."""

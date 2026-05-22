@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     git \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
