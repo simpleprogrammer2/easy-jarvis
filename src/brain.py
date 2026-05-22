@@ -61,8 +61,6 @@ class Brain:
 
         # 2. If local succeeded AND it wasn't a timeout/error, return it
         if "trouble thinking locally" not in local_result.get("speech", ""):
-            # If it wasn't important, we are done.
-            # If it WAS important, but local did a good job, we stick with it to save quota.
             return local_result
 
         # 3. Fallback to Gemini if Local failed or timed out
@@ -80,35 +78,44 @@ class Brain:
         return local_result
 
     async def _process_local(self, user_input: str):
-        """Handles inference via local llama.cpp server with increased timeout."""
-        self.history.append({"role": "user", "content": user_input})
-        if len(self.history) > self.max_history * 2:
-            self.history = self.history[-(self.max_history * 2):]
+        """Handles inference via local llama.cpp server with increased compatibility."""
+        # Merge system prompt into first message for better compatibility with some servers
+        messages = []
+        if not self.history:
+            content = f"{self.system_prompt}\n\nUSER INPUT: {user_input}"
+            messages.append({"role": "user", "content": content})
+        else:
+            messages.append({"role": "system", "content": self.system_prompt})
+            for h in self.history:
+                messages.append(h)
+            messages.append({"role": "user", "content": user_input})
 
         payload = {
-            "messages": [{"role": "system", "content": self.system_prompt}] + self.history,
+            "model": "local-model",
+            "messages": messages,
             "temperature": 0.7,
+            "max_tokens": 1024
         }
 
         try:
-            # Increased timeout to 120s for resource-constrained environments
             response = requests.post(self.local_url, json=payload, timeout=120)
-            response.raise_for_status()
+            if response.status_code != 200:
+                print(f"[!] Local Brain Error {response.status_code}: {response.text}")
+                response.raise_for_status()
+                
             data = response.json()
             content = data['choices'][0]['message']['content']
 
-            # Record assistant response in history
+            # Record in history
+            self.history.append({"role": "user", "content": user_input})
             self.history.append({"role": "assistant", "content": content})
+            if len(self.history) > self.max_history * 2:
+                self.history = self.history[-(self.max_history * 2):]
 
-            # Attempt to parse JSON, if it fails, treat as plain speech
             try:
                 return json.loads(content)
             except:
-                return {
-                    "speech": content,
-                    "command": None,
-                    "thought": "Model returned plain text instead of JSON."
-                }
+                return {"speech": content, "command": None, "thought": "Plain text response."}
         except Exception as e:
             print(f"[!] Local Brain Error: {e}")
             return {
@@ -123,13 +130,14 @@ class Brain:
             return {"speech": "Gemini not configured.", "command": None, "thought": "API key missing."}
             
         try:
-            # Map history to new SDK format
+            # Add small delay to avoid RPM limits
+            await asyncio.sleep(2)
+            
             contents = []
             for h in self.history:
                 role = "user" if h["role"] == "user" else "model"
                 contents.append(types.Content(role=role, parts=[types.Part(text=h["content"])]))
             
-            # Add current input
             contents.append(types.Content(role="user", parts=[types.Part(text=user_input)]))
 
             response = self.client.models.generate_content(
@@ -142,17 +150,12 @@ class Brain:
             )
             
             result = json.loads(response.text)
-            
-            # Add to history
             self.history.append({"role": "user", "content": user_input})
             self.history.append({"role": "assistant", "content": response.text})
-            
             return result
         except Exception as e:
             error_msg = str(e)
             print(f"[!] Gemini Brain Error: {error_msg}")
-            
-            # Quota handling (429)
             thought = f"Gemini API Error: {error_msg}"
             if "429" in error_msg:
                 thought = "Gemini API Quota Exceeded (429)."
@@ -164,9 +167,8 @@ class Brain:
             }
 
 if __name__ == "__main__":
-    # Local test
     async def test():
         b = Brain()
-        result = await b.process_command("Check the current directory and list all files.")
+        result = await b.process_command("Hello")
         print(result)
     # asyncio.run(test())
