@@ -37,7 +37,13 @@ class TeamManager:
             current_mission = leader_briefing["speech"].split("MISSION:")[1].split("\n")[0].strip()
         
         # Create a unique branch for this mission
-        mission_id = current_mission.lower().replace(" ", "-")[:20]
+        import re
+        mission_id = current_mission.lower().replace(" ", "-")
+        # Remove any character that isn't a-z, 0-9, or -
+        mission_id = re.sub(r'[^a-z0-9-]', '', mission_id)[:20]
+        # Clean up double hyphens
+        mission_id = re.sub(r'-+', '-', mission_id).strip("-")
+        
         self.branch_name = f"evolution/{mission_id}-{int(time.time())}"
         self._prepare_branch()
 
