@@ -3,6 +3,7 @@ import datetime
 import subprocess
 import os
 import asyncio
+import requests
 from src.team.personas import Personas
 from src.brain import Brain
 from src.notifier import Notifier
@@ -17,7 +18,8 @@ class TeamManager:
             "LEADER": Personas.LEADER,
             "FRONTEND": Personas.FRONTEND,
             "BACKEND": Personas.BACKEND,
-            "DESIGNER": Personas.DESIGNER
+            "DESIGNER": Personas.DESIGNER,
+            "INFRA": Personas.INFRA
         }
 
     async def start_shift(self):
@@ -39,9 +41,7 @@ class TeamManager:
         # Create a unique branch for this mission
         import re
         mission_id = current_mission.lower().replace(" ", "-")
-        # Remove any character that isn't a-z, 0-9, or -
         mission_id = re.sub(r'[^a-z0-9-]', '', mission_id)[:20]
-        # Clean up double hyphens
         mission_id = re.sub(r'-+', '-', mission_id).strip("-")
         
         self.branch_name = f"evolution/{mission_id}-{int(time.time())}"
@@ -53,8 +53,11 @@ class TeamManager:
         await self.role_action("DESIGNER", f"Mission: {current_mission}. Design the visual components.")
         await self.role_action("BACKEND", f"Mission: {current_mission}. Implement the core logic and run commands to create/edit files.")
         await self.role_action("FRONTEND", f"Mission: {current_mission}. Implement the UI templates and run commands to save them.")
+        
+        # 3. Infrastructure Check
+        await self.role_action("INFRA", f"Mission: {current_mission}. Verify the build locally (ruff, pytest). Ensure .github/workflows and vercel.json are correct for this mission. Fix any deployment issues.")
 
-        # 3. Final Leader Review & Push
+        # 4. Final Leader Review & Push
         await self.role_action("LEADER", f"Mission complete: {current_mission}. Finalizing build.")
         self._sync_and_push(current_mission)
 
@@ -138,8 +141,8 @@ class TeamManager:
                 print(f"[*] Pushing {self.branch_name} to GitHub...")
                 subprocess.run(["git", "push", "origin", self.branch_name], check=True)
                 
-                print(f"🚀 MISSION UPLOADED! Check your branches: https://github.com/simpleprogrammer2/easy-jarvis/branches")
-                self.notifier.send_alert("Mission Uploaded", f"Jarvis has completed '{mission_name}'. Review the PR here: https://github.com/simpleprogrammer2/easy-jarvis/compare/{self.branch_name}")
+                # Create Pull Request via GitHub REST API
+                self._create_github_pr(mission_name)
                 
                 # Switch back to main for next cycle
                 subprocess.run(["git", "checkout", "main"], check=True)
@@ -147,6 +150,47 @@ class TeamManager:
                 print("[*] No changes were made by the team. Skipping push.")
         except Exception as e:
             print(f"[!] Team Push Error: {e}")
+
+    def _create_github_pr(self, mission_name):
+        """Creates a Pull Request using the GitHub REST API."""
+        token = os.getenv("GITHUB_TOKEN")
+        if not token:
+            print("[!] PR Error: GITHUB_TOKEN not set.")
+            return
+
+        try:
+            remote_info = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
+            url = remote_info.stdout.strip()
+            repo_path = url.split("github.com/")[1].replace(".git", "")
+            owner, repo = repo_path.split("/")
+            if ":" in owner: owner = owner.split(":")[-1]
+        except Exception as e:
+            print(f"[!] PR Error parsing remote: {e}")
+            return
+
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        data = {
+            "title": f"🤖 Evolution: {mission_name}",
+            "body": f"This PR was generated autonomously by JARVIS.\n\n**Mission:** {mission_name}\n**Status:** Built and Verified locally.",
+            "head": self.branch_name,
+            "base": "main"
+        }
+
+        try:
+            print(f"[*] Creating Pull Request for {self.branch_name}...")
+            response = requests.post(api_url, headers=headers, json=data)
+            if response.status_code == 201:
+                pr_url = response.json().get("html_url")
+                print(f"🚀 PULL REQUEST CREATED: {pr_url}")
+                self.notifier.send_alert("PR Created", f"Jarvis has completed '{mission_name}'. Review the PR here: {pr_url}")
+            else:
+                print(f"[!] PR Failed ({response.status_code}): {response.text}")
+        except Exception as e:
+            print(f"[!] PR API Error: {e}")
 
 if __name__ == "__main__":
     manager = TeamManager()
