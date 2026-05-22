@@ -67,12 +67,27 @@
             background: radial-gradient(circle, var(--bumble-yellow) 20%, transparent 70%);
             box-shadow: 0 0 20px var(--bumble-yellow);
             animation: pulse 2s infinite ease-in-out;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .arc-reactor.active {
+            background: radial-gradient(circle, #ff4b2b 20%, transparent 70%);
+            box-shadow: 0 0 30px #ff4b2b;
+            animation: pulse-active 0.8s infinite ease-in-out;
         }
 
         @keyframes pulse {
             0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--bumble-yellow); }
             50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--bumble-yellow); }
             100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--bumble-yellow); }
+        }
+
+        @keyframes pulse-active {
+            0% { transform: scale(1.1); box-shadow: 0 0 20px #ff4b2b; }
+            50% { transform: scale(1.3); box-shadow: 0 0 50px #ff4b2b; }
+            100% { transform: scale(1.1); box-shadow: 0 0 20px #ff4b2b; }
         }
 
         /* --- Chat Feed --- */
@@ -122,6 +137,7 @@
             gap: 15px;
             max-width: 800px;
             margin: 0 auto;
+            align-items: center;
         }
 
         input {
@@ -138,7 +154,7 @@
 
         input:focus { border-color: var(--bumble-yellow); background: rgba(255, 255, 255, 0.08); }
 
-        .btn-send {
+        .btn-circle {
             background: var(--bumble-yellow);
             color: var(--dark-bg);
             border: none;
@@ -147,9 +163,24 @@
             border-radius: 50%;
             font-weight: 700;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: transform 0.2s, background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
         }
-        .btn-send:active { transform: scale(0.9); }
+        .btn-circle:active { transform: scale(0.9); }
+        .btn-mic.active {
+            background: #ff4b2b;
+            box-shadow: 0 0 15px #ff4b2b;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 75, 43, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 75, 43, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 75, 43, 0); }
+        }
 
         /* --- Loading State --- */
         .btn-loading {
@@ -188,9 +219,9 @@
     <div class="header">
         <div>
             <div style="font-weight: 700; font-size: 18px; letter-spacing: 2px;">EASY-JARVIS</div>
-            <div style="font-size: 10px; color: var(--bumble-yellow);">SYSTEM STATUS: ONLINE</div>
+            <div style="font-size: 10px; color: var(--bumble-yellow);" id="system-status">SYSTEM STATUS: ONLINE</div>
         </div>
-        <div class="arc-reactor"></div>
+        <div class="arc-reactor" id="arc-reactor" onclick="toggleMic()" title="Click to Talk"></div>
     </div>
 
     <div class="chat-container" id="chat-feed">
@@ -201,13 +232,91 @@
     </div>
 
     <div class="footer">
+        <div id="mic-status" style="text-align: center; font-size: 10px; color: var(--bumble-yellow); margin-bottom: 5px; height: 12px;"></div>
         <div class="input-group">
             <input type="text" id="user-input" placeholder="Type a command or ask a question...">
-            <button class="btn-send" onclick="sendChat()">🚀</button>
+            <button class="btn-circle" onclick="sendChat()">🚀</button>
         </div>
     </div>
 
     <script>
+        // --- Speech Recognition Setup ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isListening = false;
+        let voiceModeActive = false; // Flag to track if the last input was voice
+        const micStatus = document.getElementById('mic-status');
+        const arcReactor = document.getElementById('arc-reactor');
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isListening = true;
+                voiceModeActive = true; // User clicked mic, enable voice response
+                micStatus.innerText = "VOICE MODE ACTIVE...";
+                arcReactor.classList.add('active');
+                window.speechSynthesis.cancel();
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0])
+                    .map(result => result.transcript)
+                    .join('');
+                
+                document.getElementById('user-input').value = transcript;
+                
+                if (event.results[0].isFinal) {
+                    micStatus.innerText = "TRANSMITTING...";
+                    sendChat(true); // Explicitly pass true for voice mode
+                }
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micStatus.innerText = "";
+                arcReactor.classList.remove('active');
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech Recognition Error:', event.error);
+                micStatus.innerText = "ERROR: " + event.error.toUpperCase();
+                stopMic();
+                if (event.error === 'not-allowed') {
+                    alert("Microphone permission blocked. Please use localhost or the Chrome flag fix.");
+                }
+            };
+        }
+
+        function toggleMic() {
+            if (!recognition) {
+                alert("Speech recognition is not supported in this browser.");
+                return;
+            }
+            if (isListening) {
+                stopMic();
+            } else {
+                startMic();
+            }
+        }
+
+        function startMic() {
+            isListening = true;
+            voiceModeActive = true;
+            arcReactor.classList.add('active');
+            recognition.start();
+        }
+
+        function stopMic() {
+            isListening = false;
+            arcReactor.classList.remove('active');
+            recognition.stop();
+        }
+
         const canvas = document.getElementById('hud-canvas');
         const ctx = canvas.getContext('2d');
         let width, height, centerX, centerY;
@@ -275,7 +384,7 @@
         window.addEventListener('resize', resize);
         initHUD();
 
-        async function sendChat() {
+        async function sendChat(isVoice = false) {
             const input = document.getElementById('user-input');
             const text = input.value;
             if (!text) return;
@@ -287,11 +396,28 @@
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: text })
+                    body: JSON.stringify({ 
+                        text: text,
+                        voice_mode: isVoice || voiceModeActive 
+                    })
                 });
                 
                 const data = await response.json();
                 appendMessage('JARVIS', data.speech, data.thought, data.command);
+                
+                // --- Browser TTS (Only if voice mode was used) ---
+                if (data.speech && (isVoice || voiceModeActive)) {
+                    const utterance = new SpeechSynthesisUtterance(data.speech);
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    const voices = window.speechSynthesis.getVoices();
+                    const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Male'));
+                    if (preferredVoice) utterance.voice = preferredVoice;
+                    window.speechSynthesis.speak(utterance);
+                }
+                
+                // Reset flag for next interaction
+                voiceModeActive = false;
             } catch (e) {
                 appendMessage('SYSTEM', 'Link to brain severed.');
             }

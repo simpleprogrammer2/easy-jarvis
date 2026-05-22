@@ -3,6 +3,8 @@ services:
     build: .
     container_name: easy-jarvis
     env_file: .env
+    ports:
+      - "8000:8000"
     environment:
       - PULSE_SERVER=host.docker.internal
     volumes:
@@ -18,9 +20,11 @@ services:
     build: .
     container_name: easy-jarvis-teammate
     env_file: .env
+    environment:
+      - FORCE_NIGHT_SHIFT=1
     volumes:
       - .:/app
-    command: ["python3", "src/scripts/night_shift.py"]
+    command: ["python3", "src/scripts/evolution.py"]
     restart: unless-stopped
     depends_on:
       - easy-jarvis
@@ -32,11 +36,10 @@ services:
     volumes:
       - ./models:/models
     environment:
-      - LLAMA_ARG_MODEL=/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+      - LLAMA_ARG_MODEL=/models/qwen2.5-1.5b-instruct-q4_k_m.gguf
       - LLAMA_ARG_CTX_SIZE=8192
       - LLAMA_ARG_PORT=8080
       - LLAMA_ARG_HOST=0.0.0.0
     ports:
       - "8080:8080"
     restart: unless-stopped
-

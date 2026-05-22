@@ -1,7 +1,8 @@
 import os
 import requests
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -34,9 +35,8 @@ class Brain:
         api_key = os.getenv("GEMINI_API_KEY")
         if api_key:
             try:
-                genai.configure(api_key=api_key)
-                self.gemini_model = genai.GenerativeModel('models/gemini-1.5-flash', system_instruction=self.system_prompt)
-                self.gemini_chat = self.gemini_model.start_chat(history=[])
+                self.client = genai.Client(api_key=api_key)
+                self.gemini_model_name = 'gemini-2.0-flash'
                 self.gemini_ready = True
             except Exception as e:
                 print(f"[!] Gemini Init Warning: {e}")
@@ -44,27 +44,43 @@ class Brain:
         self.history = []
         self.max_history = 10
 
+    def _is_important(self, text: str) -> bool:
+        """Heuristic to determine if a question is 'important' enough for Gemini."""
+        important_keywords = ["important", "critical", "security", "solve", "complex", "code", "debug", "architecture", "gemini"]
+        text_lower = text.lower()
+        return any(kw in text_lower for kw in important_keywords)
+
     async def process_command(self, user_input: str):
-        """Processes user input with automatic fallback logic."""
-        print(f"[*] easy-jarvis Brain ({self.mode} primary): Conversing about '{user_input}'...")
-        
-        if self.mode == "local":
-            result = await self._process_local(user_input)
-            # If local failed, attempt Gemini fallback
-            if "trouble thinking locally" in result.get("speech", "") and self.gemini_ready:
-                print("[*] Local LLM unavailable. Falling back to Gemini API...")
-                return await self._process_gemini(user_input)
-            return result
-        else:
-            result = await self._process_gemini(user_input)
-            # If Gemini hits quota, attempt local fallback
-            if "quota" in result.get("thought", "").lower():
-                print("[*] Gemini quota hit. Falling back to Local LLM...")
-                return await self._process_local(user_input)
-            return result
+        """Processes user input with a 'Local-First' priority and intelligent fallback."""
+        print(f"[*] easy-jarvis Brain: Processing '{user_input}'...")
+
+        is_important = self._is_important(user_input)
+
+        # 1. Attempt Local First (Always respect 'local model first' request)
+        local_result = await self._process_local(user_input)
+
+        # 2. If local succeeded AND it wasn't a timeout/error, return it
+        if "trouble thinking locally" not in local_result.get("speech", ""):
+            # If it wasn't important, we are done.
+            # If it WAS important, but local did a good job, we stick with it to save quota.
+            return local_result
+
+        # 3. Fallback to Gemini if Local failed or timed out
+        if self.gemini_ready:
+            print("[*] Local LLM struggled. Attempting Gemini Cloud fallback...")
+            gemini_result = await self._process_gemini(user_input)
+
+            # 4. Handle Gemini Quota/Error fallback
+            if "snag with the cloud" in gemini_result.get("speech", ""):
+                print("[!] Gemini failed (Quota or Error). Returning local error as last resort.")
+                return local_result
+
+            return gemini_result
+
+        return local_result
 
     async def _process_local(self, user_input: str):
-        """Handles inference via local llama.cpp server."""
+        """Handles inference via local llama.cpp server with increased timeout."""
         self.history.append({"role": "user", "content": user_input})
         if len(self.history) > self.max_history * 2:
             self.history = self.history[-(self.max_history * 2):]
@@ -72,35 +88,66 @@ class Brain:
         payload = {
             "messages": [{"role": "system", "content": self.system_prompt}] + self.history,
             "temperature": 0.7,
-            "response_format": {"type": "json_object"}
         }
 
         try:
-            response = requests.post(self.local_url, json=payload, timeout=60)
+            # Increased timeout to 120s for resource-constrained environments
+            response = requests.post(self.local_url, json=payload, timeout=120)
             response.raise_for_status()
             data = response.json()
             content = data['choices'][0]['message']['content']
-            
+
             # Record assistant response in history
             self.history.append({"role": "assistant", "content": content})
-            
-            return json.loads(content)
+
+            # Attempt to parse JSON, if it fails, treat as plain speech
+            try:
+                return json.loads(content)
+            except:
+                return {
+                    "speech": content,
+                    "command": None,
+                    "thought": "Model returned plain text instead of JSON."
+                }
         except Exception as e:
             print(f"[!] Local Brain Error: {e}")
             return {
-                "speech": "I'm having trouble thinking locally. Is the model server running?",
+                "speech": "I'm having trouble thinking locally. The local model is taking too long to respond.",
                 "command": None,
                 "thought": f"Local LLM Error: {str(e)}"
             }
 
     async def _process_gemini(self, user_input: str):
-        """Handles inference via Google Gemini API."""
+        """Handles inference via Google Gemini API using new SDK."""
         if not self.gemini_ready:
             return {"speech": "Gemini not configured.", "command": None, "thought": "API key missing."}
             
         try:
-            response = self.gemini_chat.send_message(user_input, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text)
+            # Map history to new SDK format
+            contents = []
+            for h in self.history:
+                role = "user" if h["role"] == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part(text=h["content"])]))
+            
+            # Add current input
+            contents.append(types.Content(role="user", parts=[types.Part(text=user_input)]))
+
+            response = self.client.models.generate_content(
+                model=self.gemini_model_name,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=self.system_prompt,
+                    response_mime_type="application/json"
+                )
+            )
+            
+            result = json.loads(response.text)
+            
+            # Add to history
+            self.history.append({"role": "user", "content": user_input})
+            self.history.append({"role": "assistant", "content": response.text})
+            
+            return result
         except Exception as e:
             error_msg = str(e)
             print(f"[!] Gemini Brain Error: {error_msg}")
