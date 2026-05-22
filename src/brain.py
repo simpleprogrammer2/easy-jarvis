@@ -81,26 +81,38 @@ class Brain:
 
     async def _process_local(self, user_input: str):
         """Handles inference via local llama.cpp server with increased timeout."""
-        self.history.append({"role": "user", "content": user_input})
-        if len(self.history) > self.max_history * 2:
-            self.history = self.history[-(self.max_history * 2):]
+        messages = [{"role": "system", "content": self.system_prompt}]
+        
+        # Add history
+        for h in self.history:
+            messages.append(h)
+            
+        # Add current input
+        messages.append({"role": "user", "content": user_input})
 
         payload = {
-            "messages": [{"role": "system", "content": self.system_prompt}] + self.history,
+            "messages": messages,
             "temperature": 0.7,
+            "max_tokens": 1024
         }
 
         try:
             # Increased timeout to 120s for resource-constrained environments
             response = requests.post(self.local_url, json=payload, timeout=120)
-            response.raise_for_status()
+            if response.status_code != 200:
+                print(f"[!] Local Brain Error {response.status_code}: {response.text}")
+                response.raise_for_status()
+                
             data = response.json()
             content = data['choices'][0]['message']['content']
 
-            # Record assistant response in history
+            # Record in history (limiting size)
+            self.history.append({"role": "user", "content": user_input})
             self.history.append({"role": "assistant", "content": content})
+            if len(self.history) > self.max_history * 2:
+                self.history = self.history[-(self.max_history * 2):]
 
-            # Attempt to parse JSON, if it fails, treat as plain speech
+            # Attempt to parse JSON
             try:
                 return json.loads(content)
             except:
