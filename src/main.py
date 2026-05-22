@@ -1,6 +1,4 @@
 import asyncio
-import os
-import sys
 from src.ear import Ear
 from src.voice import Voice
 from src.brain import Brain

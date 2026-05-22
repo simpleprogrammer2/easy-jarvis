@@ -5,9 +5,13 @@ services:
     build: .
     container_name: easy-jarvis
     env_file: .env
+    environment:
+      - PULSE_SERVER=host.docker.internal
     volumes:
       - .:/app
       - ./memory:/app/memory
     stdin_open: true # Allows interactive input
     tty: true        # Allows interactive input
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

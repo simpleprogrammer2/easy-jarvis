@@ -60,7 +60,6 @@ class Brain:
 
 if __name__ == "__main__":
     # Local test
-    import asyncio
     async def test():
         b = Brain()
         result = await b.process_command("Check the current directory and list all files.")
