@@ -11,7 +11,6 @@ class Brain:
             raise ValueError("GEMINI_API_KEY not found in environment.")
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('models/gemini-flash-latest')
         
         self.system_prompt = """
         You are 'easy-jarvis', a Kind, Teacher-like, and Funny autonomous assistant for 'simpleprogrammer'.
@@ -29,18 +28,24 @@ class Brain:
             "thought": "Proactive safety/logic reasoning"
         }
         """
-        # Initialize chat session with system instructions
+        
+        # Use native system_instruction to save tokens in chat history
+        self.model = genai.GenerativeModel(
+            'models/gemini-1.5-flash',
+            system_instruction=self.system_prompt
+        )
+        
+        # Initialize chat session
         self.chat = self.model.start_chat(history=[])
-        self._set_system_instructions()
-
-    def _set_system_instructions(self):
-        """Initializes the chat with the system prompt."""
-        # For Flash 1.5, we send the system prompt as the first message
-        self.chat.send_message(f"SYSTEM INSTRUCTIONS: {self.system_prompt}")
+        self.max_history = 10 # Keep only last 10 exchanges to save tokens
 
     async def process_command(self, user_input: str):
         """Processes user input in a multi-turn chat session."""
         print(f"[*] easy-jarvis Brain: Conversing about '{user_input}'...")
+        
+        # Prune history if it gets too long to stay within free tier token limits
+        if len(self.chat.history) > self.max_history * 2:
+            self.chat.history = self.chat.history[-(self.max_history * 2):]
         
         try:
             response = self.chat.send_message(
@@ -58,11 +63,21 @@ class Brain:
             import json
             return json.loads(raw_text)
         except Exception as e:
-            print(f"[!] Brain Error: {e}")
+            error_msg = str(e)
+            print(f"[!] Brain Error: {error_msg}")
+            
+            # Quota handling (429)
+            if "429" in error_msg:
+                return {
+                    "speech": "I've hit my daily thinking quota. I'll take a short nap and try again later.",
+                    "command": None,
+                    "thought": "Gemini API Quota Exceeded (429)."
+                }
+                
             return {
                 "speech": "I've hit a slight cognitive snag. Could you rephrase?",
                 "command": None,
-                "thought": f"JSON Parsing or API Error: {str(e)}"
+                "thought": f"Error: {error_msg}"
             }
 
 if __name__ == "__main__":
