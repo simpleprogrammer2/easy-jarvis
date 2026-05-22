@@ -17,17 +17,20 @@ This document defines the foundational mandates for development and maintenance 
 - **System Dependencies**: Any change requiring new system-level libraries (e.g., audio drivers) must be reflected in both `Dockerfile` and `.github/workflows/main.yml`.
 - **Mocking**: For modules that interact with hardware (Ear, Voice), ensure a robust "Mock" fallback exists for CI and remote execution environments.
 
-## 🌙 Docker Overnight Teammate (Night-Shift)
-The project includes a local "Night-Shift" runner designed to act as your autonomous teammate.
+## 🌙 Docker Overnight Teammate (Team Night-Shift)
+The project includes a local "Night-Shift" multi-role team designed to build autonomously while you sleep.
 - **Schedule**: Runs from **11 PM (23:00)** to **8 AM (08:00)** daily.
+- **Team Roles**:
+    *   **Leader**: Orchestrates tasks, prioritizes the backlog, and manages merges.
+    *   **Backend**: Implements business logic, APIs, and infrastructure.
+    *   **Frontend**: Implements UI/UX features and templates.
+    *   **Designer**: Ensures visual consistency and aesthetic polish.
 - **Service**: `teammate` in `docker-compose.yml`.
 - **Workflow**: 
-    1. Reads `BACKLOG.md` for prioritized tasks.
-    2. Synchronizes with `origin/main`.
-    3. Implements features/tests autonomously.
-    4. Validates the build with `pytest`.
-    5. Commits and pushes changes directly from the container.
+    1. **Leader** reads `BACKLOG.md` and assigns tasks.
+    2. **Designer**, **Backend**, and **Frontend** specialists work sequentially on their respective areas.
+    3. **Leader** validates the final build with `pytest` and pushes to `main`.
 - **Setup**: 
     1. Ensure `GEMINI_API_KEY` is in your `.env`.
-    2. Start the teammate: `docker-compose up -d teammate`.
-    3. Monitor logs: `docker logs -f easy-jarvis-teammate`.
+    2. Start the team: `docker-compose up -d teammate`.
+    3. Monitor team communication: `docker logs -f easy-jarvis-teammate`.

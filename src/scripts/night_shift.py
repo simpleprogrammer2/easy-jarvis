@@ -4,6 +4,8 @@ import subprocess
 import os
 import sys
 
+from src.team.manager import TeamManager
+
 # Configuration for the Night Shift
 START_HOUR = 23  # 11 PM
 END_HOUR = 8     # 8 AM
@@ -21,53 +23,18 @@ def is_within_working_hours():
         return START_HOUR <= current_hour < END_HOUR
 
 def run_autonomous_cycle():
-    """The core loop for the overnight teammate."""
-    print(f"[{datetime.datetime.now()}] 🌙 Night-Shift: Starting autonomous cycle...")
-    
-    try:
-        # 1. Pull latest changes
-        print("[*] Syncing with origin...")
-        subprocess.run(["git", "pull", "origin", "main"], check=True)
-        
-        # 2. Identify Next Task
-        # Placeholder: This is where Jarvis Brain would look at BACKLOG.md
-        print("[*] Analyzing Backlog...")
-        
-        # 3. Implementation Step (Mocked Hook)
-        # In a real run, this would invoke the Brain to generate code/tests
-        print("[*] Implementing scheduled improvements...")
-        
-        # 4. Run Tests
-        print("[*] Validating build...")
-        test_result = subprocess.run(["pytest"], capture_output=True, text=True)
-        if test_result.return_code != 0:
-            print(f"[!] Build failed tests:\n{test_result.stdout}")
-            return # Don't commit failing code
-            
-        # 5. Commit and Push
-        if _has_changes():
-            print("[+] Tests passed. Committing and pushing work...")
-            subprocess.run(["git", "add", "."], check=True)
-            subprocess.run(["git", "commit", "-m", "feat(night-shift): autonomous build and sync"], check=True)
-            subprocess.run(["git", "push", "origin", "main"], check=True)
-            print("[+] Night-Shift: Work pushed successfully.")
-        else:
-            print("[*] No changes needed. Systems healthy.")
-            
-    except Exception as e:
-        print(f"[!] Night-Shift Error: {e}")
-
-def _has_changes():
-    status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-    return bool(status.stdout.strip())
+    """The core loop for the overnight teammate team."""
+    team = TeamManager()
+    team.start_shift()
 
 def _setup_git():
     """Ensures git is configured inside the container."""
     try:
-        subprocess.run(["git", "config", "--global", "user.name", "EasyJarvis-Teammate"], check=True)
-        subprocess.run(["git", "config", "--global", "user.email", "agent@easyjarvis.ai"], check=True)
+        subprocess.run(["git", "config", "--global", "user.name", "EasyJarvis-Team"], check=True)
+        subprocess.run(["git", "config", "--global", "user.email", "team@easyjarvis.ai"], check=True)
         # Avoid 'detached HEAD' issues by ensuring we are on main
-        subprocess.run(["git", "checkout", "main"], check=True)
+        if os.path.exists(".git"):
+            subprocess.run(["git", "checkout", "main"], check=True)
     except Exception as e:
         print(f"[!] Git Setup Error: {e}")
 

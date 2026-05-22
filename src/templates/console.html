@@ -279,13 +279,33 @@
             html += `<div>${text}</div>`;
             
             if (command) {
-                html += `<div style="margin-top: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-family: monospace; font-size: 12px; border: 1px dashed var(--bumble-yellow);">
-                            # PROPOSED COMMAND:<br>${command}
-                         </div>
-                         <button onclick="executeCommand('${command}')" style="margin-top: 10px; background: var(--bumble-yellow); border: none; padding: 5px 15px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 12px;">EXECUTE</button>`;
+                const cmdContainer = document.createElement('div');
+                cmdContainer.style.marginTop = '15px';
+                cmdContainer.style.background = 'rgba(0,0,0,0.3)';
+                cmdContainer.style.padding = '10px';
+                cmdContainer.style.borderRadius = '10px';
+                cmdContainer.style.fontFamily = 'monospace';
+                cmdContainer.style.fontSize = '12px';
+                cmdContainer.style.border = '1px dashed var(--bumble-yellow)';
+                cmdContainer.innerHTML = `# PROPOSED COMMAND:<br>${command}`;
+                
+                const execBtn = document.createElement('button');
+                execBtn.innerText = 'EXECUTE';
+                execBtn.style.marginTop = '10px';
+                execBtn.style.background = 'var(--bumble-yellow)';
+                execBtn.style.border = 'none';
+                execBtn.style.padding = '8px 20px';
+                execBtn.style.borderRadius = '12px';
+                execBtn.style.fontWeight = '700';
+                execBtn.style.cursor = 'pointer';
+                execBtn.style.fontSize = '12px';
+                
+                execBtn.onclick = () => executeCommand(command);
+                
+                card.appendChild(cmdContainer);
+                card.appendChild(execBtn);
             }
             
-            card.innerHTML = html;
             feed.appendChild(card);
             feed.scrollTop = feed.scrollHeight;
         }
