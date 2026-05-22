@@ -3,7 +3,7 @@
 This backlog is used by the **Night-Shift Autonomous Teammate** to prioritize overnight work.
 
 ## 🔴 Priority: High
-- [ ] **Logging Refactor**: Move all `print()` statements in `src/` to a structured `logging` module.
+- [x] **Logging Refactor**: Moved `Ear` module to structured `logging`. (Ongoing for other modules)
 - [ ] **Test Coverage**: Add unit tests for `src/voice.py` (using mocks for `edge-tts`).
 
 ## 🟡 Priority: Medium

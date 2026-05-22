@@ -1,11 +1,17 @@
+import logging
+import numpy as np
+import time
+import os
+
 try:
     import pyaudio
     PYAUDIO_AVAILABLE = True
 except ImportError:
     PYAUDIO_AVAILABLE = False
-import numpy as np
-import time
-import os
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("Ear")
 
 class Ear:
     def __init__(self, threshold=1000, chunk_size=1024, rate=44100):
@@ -16,6 +22,7 @@ class Ear:
             try:
                 self.p = pyaudio.PyAudio()
             except Exception:
+                logger.error("Failed to initialize PyAudio.")
                 self.p = None
         else:
             self.p = None
@@ -26,7 +33,7 @@ class Ear:
     def start_listening(self, on_wake_callback):
         """Starts the audio stream and listens for claps."""
         if not self.p:
-            print("[!] Ear Warning: PyAudio or Microphone not available.")
+            logger.warning("PyAudio or Microphone not available. Falling back to Mock listener.")
             self._start_mock_listener(on_wake_callback)
             return
 
@@ -38,9 +45,9 @@ class Ear:
                 input=True,
                 frames_per_buffer=self.chunk_size
             )
-            print("[*] easy-jarvis Ear: Listening for double-claps...")
+            logger.info("easy-jarvis Ear: Listening for double-claps...")
         except Exception as e:
-            print(f"[!] Ear Error: Could not open microphone. {e}")
+            logger.error(f"Could not open microphone: {e}")
             self._start_mock_listener(on_wake_callback)
             return
 
@@ -54,7 +61,7 @@ class Ear:
                     self._handle_clap(on_wake_callback)
 
             except Exception as e:
-                print(f"[!] Stream Error: {e}")
+                logger.error(f"Stream Error: {e}")
                 break
 
     def _handle_clap(self, on_wake_callback):
@@ -62,7 +69,7 @@ class Ear:
         time_since_last = current_time - self.last_clap_time
         
         if self.double_clap_window[0] < time_since_last < self.double_clap_window[1]:
-            print("[+] Double-clap detected! Waking up...")
+            logger.info("Double-clap detected! Waking up...")
             on_wake_callback()
             self.last_clap_time = 0 # Reset
         else:
@@ -70,17 +77,18 @@ class Ear:
 
     def _start_mock_listener(self, on_wake_callback):
         """Fallback listener that uses a file trigger for testing."""
-        print("[!] Falling back to MOCK EAR. Use 'touch wake.trigger' to wake easy-jarvis.")
+        logger.info("Mock listener active. Use 'touch wake.trigger' to wake easy-jarvis.")
         trigger_file = "wake.trigger"
         if os.path.exists(trigger_file):
             os.remove(trigger_file)
         
         while True:
             if os.path.exists(trigger_file):
-                print("[+] Mock trigger detected! Waking up...")
+                logger.info("Mock trigger detected! Waking up...")
                 os.remove(trigger_file)
                 on_wake_callback()
             time.sleep(1)
+
 
 if __name__ == "__main__":
     def my_callback():
