@@ -1,17 +1,17 @@
 import os
+import requests
+import json
 import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class Brain:
-    def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY not found in environment.")
+    def __init__(self, mode="local"):
+        self.mode = mode # "local" or "gemini"
+        self.local_url = os.getenv("LOCAL_LLM_URL", "http://local-llm:8080/v1/chat/completions")
         
-        genai.configure(api_key=api_key)
-        
+        # System instructions
         self.system_prompt = """
         You are 'easy-jarvis', a Kind, Teacher-like, and Funny autonomous assistant for 'simpleprogrammer'.
         
@@ -29,56 +29,64 @@ class Brain:
         }
         """
         
-        # Use native system_instruction to save tokens in chat history
-        self.model = genai.GenerativeModel(
-            'models/gemini-1.5-flash',
-            system_instruction=self.system_prompt
-        )
+        if self.mode == "gemini":
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY not found in environment.")
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel('models/gemini-1.5-flash', system_instruction=self.system_prompt)
+            self.chat = self.model.start_chat(history=[])
         
-        # Initialize chat session
-        self.chat = self.model.start_chat(history=[])
-        self.max_history = 10 # Keep only last 10 exchanges to save tokens
+        self.history = []
+        self.max_history = 10
 
     async def process_command(self, user_input: str):
-        """Processes user input in a multi-turn chat session."""
-        print(f"[*] easy-jarvis Brain: Conversing about '{user_input}'...")
+        """Processes user input using either Local LLM or Gemini."""
+        print(f"[*] easy-jarvis Brain ({self.mode} mode): Conversing about '{user_input}'...")
         
-        # Prune history if it gets too long to stay within free tier token limits
-        if len(self.chat.history) > self.max_history * 2:
-            self.chat.history = self.chat.history[-(self.max_history * 2):]
-        
+        if self.mode == "local":
+            return await self._process_local(user_input)
+        else:
+            return await self._process_gemini(user_input)
+
+    async def _process_local(self, user_input: str):
+        """Handles inference via local llama.cpp server."""
+        self.history.append({"role": "user", "content": user_input})
+        if len(self.history) > self.max_history * 2:
+            self.history = self.history[-(self.max_history * 2):]
+
+        payload = {
+            "messages": [{"role": "system", "content": self.system_prompt}] + self.history,
+            "temperature": 0.7,
+            "response_format": {"type": "json_object"}
+        }
+
         try:
-            response = self.chat.send_message(
-                user_input,
-                generation_config={"response_mime_type": "application/json"}
-            )
+            response = requests.post(self.local_url, json=payload, timeout=60)
+            response.raise_for_status()
+            data = response.json()
+            content = data['choices'][0]['message']['content']
             
-            # Robust JSON cleaning
-            raw_text = response.text.strip()
-            if "```json" in raw_text:
-                raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw_text:
-                raw_text = raw_text.split("```")[1].split("```")[0].strip()
+            # Record assistant response in history
+            self.history.append({"role": "assistant", "content": content})
             
-            import json
-            return json.loads(raw_text)
+            return json.loads(content)
         except Exception as e:
-            error_msg = str(e)
-            print(f"[!] Brain Error: {error_msg}")
-            
-            # Quota handling (429)
-            if "429" in error_msg:
-                return {
-                    "speech": "I've hit my daily thinking quota. I'll take a short nap and try again later.",
-                    "command": None,
-                    "thought": "Gemini API Quota Exceeded (429)."
-                }
-                
+            print(f"[!] Local Brain Error: {e}")
             return {
-                "speech": "I've hit a slight cognitive snag. Could you rephrase?",
+                "speech": "I'm having trouble thinking locally. Is the model server running?",
                 "command": None,
-                "thought": f"Error: {error_msg}"
+                "thought": str(e)
             }
+
+    async def _process_gemini(self, user_input: str):
+        """Handles inference via Google Gemini API."""
+        try:
+            response = self.chat.send_message(user_input, generation_config={"response_mime_type": "application/json"})
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"[!] Gemini Brain Error: {e}")
+            return {"speech": "API snag. Check quota.", "command": None, "thought": str(e)}
 
 if __name__ == "__main__":
     # Local test

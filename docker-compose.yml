@@ -26,3 +26,19 @@ services:
     restart: unless-stopped
     depends_on:
       - easy-jarvis
+      - local-llm
+
+  local-llm:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    container_name: easy-jarvis-local-llm
+    volumes:
+      - ./models:/models
+    environment:
+      - LLAMA_ARG_MODEL=/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+      - LLAMA_ARG_CTX_SIZE=8192
+      - LLAMA_ARG_PORT=8080
+      - LLAMA_ARG_HOST=0.0.0.0
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
