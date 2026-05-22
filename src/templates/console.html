@@ -150,6 +150,35 @@
             transition: transform 0.2s;
         }
         .btn-send:active { transform: scale(0.9); }
+
+        /* --- Loading State --- */
+        .btn-loading {
+            position: relative;
+            overflow: hidden;
+            background: rgba(255, 210, 0, 0.4) !important;
+            color: transparent !important;
+            pointer-events: none;
+        }
+
+        .btn-loading::after {
+            content: "SCANNING...";
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--dark-bg);
+            font-weight: 700;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            background-size: 200% 100%;
+            animation: loading-scan 1.5s infinite;
+        }
+
+        @keyframes loading-scan {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
 <body>
@@ -272,11 +301,18 @@
             const feed = document.getElementById('chat-feed');
             const card = document.createElement('div');
             card.className = 'hologram-card';
-            if (role === 'USER') card.style.alignSelf = 'flex-end';
+            
+            if (role === 'USER') {
+                card.style.alignSelf = 'flex-end';
+                card.style.borderColor = 'var(--stark-blue)';
+                card.style.background = 'rgba(0, 210, 255, 0.05)';
+            }
             
             let html = '';
             if (thought) html += `<div class="thought-bubble">🧠 ${thought}</div>`;
             html += `<div>${text}</div>`;
+            
+            card.innerHTML = html;
             
             if (command) {
                 const cmdContainer = document.createElement('div');
@@ -300,7 +336,7 @@
                 execBtn.style.cursor = 'pointer';
                 execBtn.style.fontSize = '12px';
                 
-                execBtn.onclick = () => executeCommand(command);
+                execBtn.onclick = (e) => executeCommand(command, e.target);
                 
                 card.appendChild(cmdContainer);
                 card.appendChild(execBtn);
@@ -310,7 +346,8 @@
             feed.scrollTop = feed.scrollHeight;
         }
 
-        async function executeCommand(cmd) {
+        async function executeCommand(cmd, btn) {
+            if (btn) btn.classList.add('btn-loading');
             try {
                 const response = await fetch('/execute', {
                     method: 'POST',
@@ -321,6 +358,8 @@
                 appendMessage('SYSTEM', 'Execution Output:', '', data.output);
             } catch (e) {
                 appendMessage('SYSTEM', 'Execution failed.');
+            } finally {
+                if (btn) btn.classList.remove('btn-loading');
             }
         }
 
