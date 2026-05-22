@@ -29,25 +29,39 @@ class Brain:
         }
         """
         
-        if self.mode == "gemini":
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY not found in environment.")
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('models/gemini-1.5-flash', system_instruction=self.system_prompt)
-            self.chat = self.model.start_chat(history=[])
-        
+        # Initialize Gemini backend (lazy-ready)
+        self.gemini_ready = False
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            try:
+                genai.configure(api_key=api_key)
+                self.gemini_model = genai.GenerativeModel('models/gemini-1.5-flash', system_instruction=self.system_prompt)
+                self.gemini_chat = self.gemini_model.start_chat(history=[])
+                self.gemini_ready = True
+            except Exception as e:
+                print(f"[!] Gemini Init Warning: {e}")
+
         self.history = []
         self.max_history = 10
 
     async def process_command(self, user_input: str):
-        """Processes user input using either Local LLM or Gemini."""
-        print(f"[*] easy-jarvis Brain ({self.mode} mode): Conversing about '{user_input}'...")
+        """Processes user input with automatic fallback logic."""
+        print(f"[*] easy-jarvis Brain ({self.mode} primary): Conversing about '{user_input}'...")
         
         if self.mode == "local":
-            return await self._process_local(user_input)
+            result = await self._process_local(user_input)
+            # If local failed, attempt Gemini fallback
+            if "trouble thinking locally" in result.get("speech", "") and self.gemini_ready:
+                print("[*] Local LLM unavailable. Falling back to Gemini API...")
+                return await self._process_gemini(user_input)
+            return result
         else:
-            return await self._process_gemini(user_input)
+            result = await self._process_gemini(user_input)
+            # If Gemini hits quota, attempt local fallback
+            if "quota" in result.get("thought", "").lower():
+                print("[*] Gemini quota hit. Falling back to Local LLM...")
+                return await self._process_local(user_input)
+            return result
 
     async def _process_local(self, user_input: str):
         """Handles inference via local llama.cpp server."""
@@ -76,17 +90,31 @@ class Brain:
             return {
                 "speech": "I'm having trouble thinking locally. Is the model server running?",
                 "command": None,
-                "thought": str(e)
+                "thought": f"Local LLM Error: {str(e)}"
             }
 
     async def _process_gemini(self, user_input: str):
         """Handles inference via Google Gemini API."""
+        if not self.gemini_ready:
+            return {"speech": "Gemini not configured.", "command": None, "thought": "API key missing."}
+            
         try:
-            response = self.chat.send_message(user_input, generation_config={"response_mime_type": "application/json"})
+            response = self.gemini_chat.send_message(user_input, generation_config={"response_mime_type": "application/json"})
             return json.loads(response.text)
         except Exception as e:
-            print(f"[!] Gemini Brain Error: {e}")
-            return {"speech": "API snag. Check quota.", "command": None, "thought": str(e)}
+            error_msg = str(e)
+            print(f"[!] Gemini Brain Error: {error_msg}")
+            
+            # Quota handling (429)
+            thought = f"Gemini API Error: {error_msg}"
+            if "429" in error_msg:
+                thought = "Gemini API Quota Exceeded (429)."
+                
+            return {
+                "speech": "I've hit a slight cognitive snag with the cloud.",
+                "command": None,
+                "thought": thought
+            }
 
 if __name__ == "__main__":
     # Local test
