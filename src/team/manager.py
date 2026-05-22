@@ -32,7 +32,7 @@ class TeamManager:
                 backlog_content = f.read()
 
         # 1. Leader: Mission Briefing
-        leader_briefing = await self.role_action("LEADER", f"Current Backlog:\n{backlog_content}\n\nTASK: Review the backlog and pick the single most important task. State as 'MISSION: [task name]'.")
+        leader_briefing = await self.role_action("LEADER", f"Current Backlog:\n{backlog_content}\n\nTASK: Review the backlog and pick the single most important task. State as 'MISSION: [task name][...]
         
         current_mission = "General Improvements"
         if "MISSION:" in leader_briefing.get("speech", ""):
@@ -55,7 +55,7 @@ class TeamManager:
         await self.role_action("FRONTEND", f"Mission: {current_mission}. Implement the UI templates and run commands to save them.")
         
         # 3. Infrastructure Check
-        await self.role_action("INFRA", f"Mission: {current_mission}. Verify the build locally (ruff, pytest). Ensure .github/workflows and vercel.json are correct for this mission. Fix any deployment issues.")
+        await self.role_action("INFRA", f"Mission: {current_mission}. Verify the build locally (ruff, pytest). Ensure .github/workflows and vercel.json are correct for this mission. Fix any deploy[...]
 
         # 4. Final Leader Review & Push
         await self.role_action("LEADER", f"Mission complete: {current_mission}. Finalizing build.")
@@ -163,7 +163,8 @@ class TeamManager:
             url = remote_info.stdout.strip()
             repo_path = url.split("github.com/")[1].replace(".git", "")
             owner, repo = repo_path.split("/")
-            if ":" in owner: owner = owner.split(":")[-1]
+            if ":" in owner:
+                owner = owner.split(":")[-1]
         except Exception as e:
             print(f"[!] PR Error parsing remote: {e}")
             return
