@@ -183,7 +183,7 @@
             width: 100%; height: 100%;
             background: rgba(0,0,0,0.85);
             z-index: 2000;
-            display: flex;
+            display: none; /* Hidden by default */
             justify-content: center;
             align-items: center;
             backdrop-filter: blur(15px);
@@ -356,9 +356,9 @@
         const matrixData = {};
         const needsWeight = {{ 'true' if needs_weight else 'false' }};
 
-        if (!needsWeight && currentHabitIndex === 0 && !localStorage.getItem('matrix_synced_today')) {
-            // Already synced or not needed?
-            document.getElementById('swipe-overlay').style.display = 'none';
+        // Show sync gateway if backend says weight update is needed
+        if (needsWeight) {
+            document.getElementById('swipe-overlay').style.display = 'flex';
         }
 
         // --- Swipe Logic ---
