@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from src.voice import Voice
-from src.brain import BrainFactory
+from src.brain import Brain
 from src.executor import Executor
 from src.core.config import setup_logging, SYSTEM_STATUS_ONLINE
 from src.core.matrix_manager import MatrixManager
@@ -17,7 +17,7 @@ logger = setup_logging("Main")
 app = FastAPI(title="easy-jarvis Console")
 
 # --- Globals (Managed via Factory where applicable) ---
-brain = BrainFactory.create_brain()
+brain = Brain.create_brain()
 executor = Executor()
 voice = Voice()
 matrix = MatrixManager()
