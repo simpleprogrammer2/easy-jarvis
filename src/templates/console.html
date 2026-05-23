@@ -92,33 +92,39 @@
 
         .swipe-card {
             width: 320px;
-            height: 450px;
-            background: rgba(20, 20, 22, 0.9);
+            height: 400px;
+            background: rgba(20, 20, 22, 0.95);
             border: 2px solid var(--bumble-yellow);
-            border-radius: 30px;
+            border-radius: 40px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 30px;
-            box-shadow: 0 0 50px var(--hud-glow);
+            padding: 40px;
+            box-shadow: 0 0 60px rgba(0,0,0,0.5);
             position: relative;
             cursor: grab;
             user-select: none;
         }
 
         .swipe-label {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 700;
-            color: var(--bumble-yellow);
-            margin-bottom: 10px;
+            color: white;
+            margin-top: 20px;
+        }
+
+        .habit-icon-large {
+            font-size: 100px;
+            filter: drop-shadow(0 0 20px var(--hud-glow));
         }
 
         .swipe-hint {
-            font-size: 12px;
-            opacity: 0.6;
-            margin-top: 40px;
+            font-size: 11px;
+            opacity: 0.5;
+            margin-top: 30px;
+            letter-spacing: 1px;
         }
 
         .swipe-indicator {
@@ -164,20 +170,20 @@
         <div class="swipe-card" id="current-swipe-card">
             <div class="swipe-indicator yes">YES</div>
             <div class="swipe-indicator no">NO</div>
-            <div id="habit-icon" style="font-size: 60px; margin-bottom: 20px;">📱</div>
-            <div class="swipe-label" id="habit-name">No Phone?</div>
-            <div style="font-size: 14px; opacity: 0.8;">Did you resist the morning scroll?</div>
+            <div id="habit-icon"><div class="habit-icon-large">📱</div></div>
+            <div class="swipe-label" id="habit-name">NO PHONE</div>
             
             <div class="swipe-hint">
-                [ ← Swipe Left for NO ] &nbsp;&nbsp; [ Swipe Right for YES → ]
+                [ ← NO ] &nbsp;&nbsp; [ YES → ]
             </div>
         </div>
         
         <!-- Weight Input (Hidden until sequence ends) -->
         <div class="swipe-card" id="weight-card" style="display: none; cursor: default;">
+             <div class="habit-icon-large">⚖️</div>
              <div class="swipe-label">Current Weight</div>
-             <input type="number" id="weight-input" placeholder="lbs" style="width: 100px; text-align: center; margin: 20px 0;">
-             <button onclick="submitMatrix()" style="background: var(--bumble-yellow); border: none; padding: 10px 30px; border-radius: 20px; font-weight: 700; cursor: pointer;">SYNC MATRIX</button>
+             <input type="number" id="weight-input" placeholder="kg" style="width: 120px; text-align: center; margin: 25px 0; font-size: 24px;">
+             <button onclick="submitMatrix()" style="background: var(--bumble-yellow); border: none; padding: 15px 40px; border-radius: 30px; font-weight: 700; cursor: pointer; letter-spacing: 1px;">SYNC MATRIX</button>
         </div>
     </div>
 
@@ -203,10 +209,10 @@
     <script>
         // --- Habits Sequence ---
         const habits = [
-            { id: 'no_phone', name: 'No Phone?', icon: '📱', hint: 'Did you resist the morning scroll?' },
-            { id: 'read_book', name: 'Read Book?', icon: '📚', hint: 'Did you feed the brain today?' },
-            { id: 'exercise', name: 'Exercise?', icon: '🏃', hint: 'Did you move your physical body?' },
-            { id: 'meditation', name: 'Meditation?', icon: '🧘', hint: 'Did you find the silence?' }
+            { id: 'no_phone', name: 'NO PHONE', icon: '📱', hint: 'Morning scroll resisted?' },
+            { id: 'read_book', name: 'READ BOOK', icon: '📚', hint: 'Brain fed?' },
+            { id: 'exercise', name: 'EXERCISE', icon: '🏃', hint: 'Body moved?' },
+            { id: 'meditation', name: 'MEDITATION', icon: '🧘', hint: 'Silence found?' }
         ];
         
         let currentHabitIndex = 0;
@@ -253,7 +259,7 @@
                 // Load Next
                 const next = habits[currentHabitIndex];
                 document.getElementById('habit-name').innerText = next.name;
-                document.getElementById('habit-icon').innerText = next.icon;
+                document.getElementById('habit-icon').innerHTML = `<div class="habit-icon-large">${next.icon}</div>`;
                 card.style.transform = 'none';
                 yesIndicator.style.opacity = 0;
                 noIndicator.style.opacity = 0;
@@ -290,7 +296,7 @@
             document.getElementById('swipe-overlay').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('swipe-overlay').style.display = 'none';
-                appendMessage('JARVIS', 'Matrix Sync Complete. Physical metrics updated.');
+                // Jarvis remains silent as per user request ("no remark")
             }, 500);
         }
 
