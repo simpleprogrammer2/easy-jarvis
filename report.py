@@ -6,4 +6,3 @@ def generate_morning_report():
     return {'message': 'Morning Report generated successfully!'}
 if __name__ == '__main__':
     app.run(debug=True)
-EOF
