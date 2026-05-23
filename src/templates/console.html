@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>easy-jarvis | Cinematic Console</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -11,6 +12,8 @@
             --stark-blue: #00D2FF;
             --dark-bg: #0A0A0B;
             --hud-glow: rgba(255, 210, 0, 0.15);
+            --danger-red: #ff4b2b;
+            --success-green: #00ff88;
         }
         
         body {
@@ -26,7 +29,6 @@
             position: relative;
         }
 
-        /* --- Canvas HUD Background --- */
         #hud-canvas {
             position: fixed;
             top: 0; left: 0;
@@ -35,21 +37,6 @@
             opacity: 0.4;
         }
 
-        /* --- Scan-line HUD Overlay --- */
-        body::before {
-            content: " ";
-            position: fixed;
-...
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%;
-            z-index: 1000;
-            pointer-events: none;
-            opacity: 0.15;
-        }
-
-        /* --- Header & Arc Reactor --- */
         .header {
             padding: 20px;
             display: flex;
@@ -68,29 +55,8 @@
             box-shadow: 0 0 20px var(--bumble-yellow);
             animation: pulse 2s infinite ease-in-out;
             cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
         }
 
-        .arc-reactor.active {
-            background: radial-gradient(circle, #ff4b2b 20%, transparent 70%);
-            box-shadow: 0 0 30px #ff4b2b;
-            animation: pulse-active 0.8s infinite ease-in-out;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--bumble-yellow); }
-            50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 40px var(--bumble-yellow); }
-            100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px var(--bumble-yellow); }
-        }
-
-        @keyframes pulse-active {
-            0% { transform: scale(1.1); box-shadow: 0 0 20px #ff4b2b; }
-            50% { transform: scale(1.3); box-shadow: 0 0 50px #ff4b2b; }
-            100% { transform: scale(1.1); box-shadow: 0 0 20px #ff4b2b; }
-        }
-
-        /* --- Chat Feed --- */
         .chat-container {
             flex-grow: 1;
             overflow-y: auto;
@@ -98,7 +64,6 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
-            scrollbar-width: thin;
         }
 
         .hologram-card {
@@ -108,28 +73,68 @@
             padding: 20px;
             backdrop-filter: blur(5px);
             max-width: 80%;
-            animation: slideIn 0.4s ease-out;
+            position: relative;
         }
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
+        /* --- Swipe Overlay --- */
+        #swipe-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(15px);
+            transition: opacity 0.5s;
         }
 
-        .thought-bubble {
-            font-size: 11px;
+        .swipe-card {
+            width: 320px;
+            height: 450px;
+            background: rgba(20, 20, 22, 0.9);
+            border: 2px solid var(--bumble-yellow);
+            border-radius: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 30px;
+            box-shadow: 0 0 50px var(--hud-glow);
+            position: relative;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .swipe-label {
+            font-size: 24px;
+            font-weight: 700;
             color: var(--bumble-yellow);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-            opacity: 0.7;
+            margin-bottom: 10px;
         }
 
-        /* --- Footer & Input --- */
+        .swipe-hint {
+            font-size: 12px;
+            opacity: 0.6;
+            margin-top: 40px;
+        }
+
+        .swipe-indicator {
+            position: absolute;
+            font-size: 80px;
+            font-weight: 900;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .swipe-indicator.yes { color: var(--success-green); left: 20px; transform: rotate(-20deg); }
+        .swipe-indicator.no { color: var(--danger-red); right: 20px; transform: rotate(20deg); }
+
         .footer {
             padding: 20px;
             background: rgba(0, 0, 0, 0.8);
-            border-top: 1px solid rgba(255, 210, 0, 0.1);
         }
 
         .input-group {
@@ -137,7 +142,6 @@
             gap: 15px;
             max-width: 800px;
             margin: 0 auto;
-            align-items: center;
         }
 
         input {
@@ -147,68 +151,7 @@
             border-radius: 30px;
             padding: 15px 25px;
             color: white;
-            font-family: inherit;
-            font-size: 16px;
             outline: none;
-        }
-
-        input:focus { border-color: var(--bumble-yellow); background: rgba(255, 255, 255, 0.08); }
-
-        .btn-circle {
-            background: var(--bumble-yellow);
-            color: var(--dark-bg);
-            border: none;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-        .btn-circle:active { transform: scale(0.9); }
-        .btn-mic.active {
-            background: #ff4b2b;
-            box-shadow: 0 0 15px #ff4b2b;
-            animation: pulse-red 1.5s infinite;
-        }
-
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(255, 75, 43, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 75, 43, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 75, 43, 0); }
-        }
-
-        /* --- Loading State --- */
-        .btn-loading {
-            position: relative;
-            overflow: hidden;
-            background: rgba(255, 210, 0, 0.4) !important;
-            color: transparent !important;
-            pointer-events: none;
-        }
-
-        .btn-loading::after {
-            content: "SCANNING...";
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--dark-bg);
-            font-weight: 700;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-            background-size: 200% 100%;
-            animation: loading-scan 1.5s infinite;
-        }
-
-        @keyframes loading-scan {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
         }
     </style>
 </head>
@@ -216,281 +159,157 @@
 
     <canvas id="hud-canvas"></canvas>
 
+    <!-- Swipe-to-Sync Overlay -->
+    <div id="swipe-overlay">
+        <div class="swipe-card" id="current-swipe-card">
+            <div class="swipe-indicator yes">YES</div>
+            <div class="swipe-indicator no">NO</div>
+            <div id="habit-icon" style="font-size: 60px; margin-bottom: 20px;">📱</div>
+            <div class="swipe-label" id="habit-name">No Phone?</div>
+            <div style="font-size: 14px; opacity: 0.8;">Did you resist the morning scroll?</div>
+            
+            <div class="swipe-hint">
+                [ ← Swipe Left for NO ] &nbsp;&nbsp; [ Swipe Right for YES → ]
+            </div>
+        </div>
+        
+        <!-- Weight Input (Hidden until sequence ends) -->
+        <div class="swipe-card" id="weight-card" style="display: none; cursor: default;">
+             <div class="swipe-label">Current Weight</div>
+             <input type="number" id="weight-input" placeholder="lbs" style="width: 100px; text-align: center; margin: 20px 0;">
+             <button onclick="submitMatrix()" style="background: var(--bumble-yellow); border: none; padding: 10px 30px; border-radius: 20px; font-weight: 700; cursor: pointer;">SYNC MATRIX</button>
+        </div>
+    </div>
+
     <div class="header">
         <div>
             <div style="font-weight: 700; font-size: 18px; letter-spacing: 2px;">EASY-JARVIS</div>
-            <div style="font-size: 10px; color: var(--bumble-yellow);" id="system-status">SYSTEM STATUS: ONLINE</div>
+            <div style="font-size: 10px; color: var(--bumble-yellow);">SYSTEM STATUS: ONLINE</div>
         </div>
-        <div class="arc-reactor" id="arc-reactor" onclick="toggleMic()" title="Click to Talk"></div>
+        <div class="arc-reactor" id="arc-reactor"></div>
     </div>
 
     <div class="chat-container" id="chat-feed">
-        <div class="hologram-card">
-            <div class="thought-bubble">Startup sequence complete</div>
-            I am awake, simpleprogrammer. How can I help you build today?
-        </div>
+        <div class="hologram-card">I am awake, simpleprogrammer. Life Matrix sync pending.</div>
     </div>
 
     <div class="footer">
-        <div id="mic-status" style="text-align: center; font-size: 10px; color: var(--bumble-yellow); margin-bottom: 5px; height: 12px;"></div>
         <div class="input-group">
-            <input type="text" id="user-input" placeholder="Type a command or ask a question...">
-            <button class="btn-circle" onclick="sendChat()">🚀</button>
+            <input type="text" id="user-input" placeholder="Type a command...">
+            <button onclick="sendChat()" style="background:var(--bumble-yellow); border:none; border-radius:50%; width:50px; height:50px; cursor:pointer;">🚀</button>
         </div>
     </div>
 
     <script>
-        // --- Speech Recognition Setup ---
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let recognition = null;
-        let isListening = false;
-        let voiceModeActive = false; // Flag to track if the last input was voice
-        const micStatus = document.getElementById('mic-status');
-        const arcReactor = document.getElementById('arc-reactor');
-
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.lang = 'en-US';
-            recognition.interimResults = true;
-
-            recognition.onstart = () => {
-                isListening = true;
-                voiceModeActive = true; // User clicked mic, enable voice response
-                micStatus.innerText = "VOICE MODE ACTIVE...";
-                arcReactor.classList.add('active');
-                window.speechSynthesis.cancel();
-            };
-
-            recognition.onresult = (event) => {
-                const transcript = Array.from(event.results)
-                    .map(result => result[0])
-                    .map(result => result.transcript)
-                    .join('');
-                
-                document.getElementById('user-input').value = transcript;
-                
-                if (event.results[0].isFinal) {
-                    micStatus.innerText = "TRANSMITTING...";
-                    sendChat(true); // Explicitly pass true for voice mode
-                }
-            };
-
-            recognition.onend = () => {
-                isListening = false;
-                micStatus.innerText = "";
-                arcReactor.classList.remove('active');
-            };
-
-            recognition.onerror = (event) => {
-                console.error('Speech Recognition Error:', event.error);
-                micStatus.innerText = "ERROR: " + event.error.toUpperCase();
-                stopMic();
-                if (event.error === 'not-allowed') {
-                    alert("Microphone permission blocked. Please use localhost or the Chrome flag fix.");
-                }
-            };
-        }
-
-        function toggleMic() {
-            if (!recognition) {
-                alert("Speech recognition is not supported in this browser.");
-                return;
-            }
-            if (isListening) {
-                stopMic();
-            } else {
-                startMic();
-            }
-        }
-
-        function startMic() {
-            isListening = true;
-            voiceModeActive = true;
-            arcReactor.classList.add('active');
-            recognition.start();
-        }
-
-        function stopMic() {
-            isListening = false;
-            arcReactor.classList.remove('active');
-            recognition.stop();
-        }
-
-        const canvas = document.getElementById('hud-canvas');
-        const ctx = canvas.getContext('2d');
-        let width, height, centerX, centerY;
-        let rings = [];
-
-        const ringConfigs = [
-            { radius: 100, speed: 0.005, dir: 1,  dash: [40, 20], color: 'rgba(255, 210, 0, 0.3)', width: 1 },
-            { radius: 150, speed: 0.002, dir: -1, dash: [100, 40], color: 'rgba(255, 210, 0, 0.2)', width: 8 },
-            { radius: 200, speed: 0.01,  dir: 1,  dash: [2, 15], color: 'rgba(255, 210, 0, 0.4)', width: 2 },
-            { radius: 250, speed: 0.003, dir: -1, dash: [200, 50], color: 'rgba(255, 210, 0, 0.1)', width: 12 },
-            { radius: 300, speed: 0.008, dir: 1,  dash: [1, 20], color: 'rgba(255, 210, 0, 0.5)', width: 1 }
+        // --- Habits Sequence ---
+        const habits = [
+            { id: 'no_phone', name: 'No Phone?', icon: '📱', hint: 'Did you resist the morning scroll?' },
+            { id: 'read_book', name: 'Read Book?', icon: '📚', hint: 'Did you feed the brain today?' },
+            { id: 'exercise', name: 'Exercise?', icon: '🏃', hint: 'Did you move your physical body?' },
+            { id: 'meditation', name: 'Meditation?', icon: '🧘', hint: 'Did you find the silence?' }
         ];
+        
+        let currentHabitIndex = 0;
+        const matrixData = {};
+        const needsWeight = {{ 'true' if needs_weight else 'false' }};
 
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-            centerX = width / 2;
-            centerY = height / 2;
-        }
+        // --- Swipe Logic ---
+        const card = document.getElementById('current-swipe-card');
+        const yesIndicator = card.querySelector('.yes');
+        const noIndicator = card.querySelector('.no');
+        let startX = 0;
+        let isDragging = false;
 
-        function initHUD() {
-            resize();
-            rings = ringConfigs.map(config => ({ ...config, angle: Math.random() * Math.PI * 2 }));
-            animateHUD();
-        }
-
-        function drawRing(ring) {
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate(ring.angle);
-            ctx.beginPath();
-            ctx.arc(0, 0, ring.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = ring.color;
-            ctx.lineWidth = ring.width;
-            ctx.setLineDash(ring.dash);
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        function animateHUD(time) {
-            ctx.clearRect(0, 0, width, height);
+        card.addEventListener('mousedown', (e) => { startX = e.clientX; isDragging = true; });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const delta = e.clientX - startX;
+            card.style.transform = `translateX(${delta}px) rotate(${delta * 0.05}deg)`;
             
-            // Draw Radar Sweep
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate(time * 0.0005);
-            const grad = ctx.createRadialGradient(0, 0, 50, 0, 0, 400);
-            grad.addColorStop(0, 'rgba(255, 210, 0, 0)');
-            grad.addColorStop(1, 'rgba(255, 210, 0, 0.05)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.arc(0, 0, 400, 0, Math.PI * 0.1);
-            ctx.fill();
-            ctx.restore();
+            yesIndicator.style.opacity = delta > 50 ? (delta - 50) / 100 : 0;
+            noIndicator.style.opacity = delta < -50 ? (-delta - 50) / 100 : 0;
+        });
 
-            rings.forEach(ring => {
-                ring.angle += ring.speed * ring.dir;
-                drawRing(ring);
+        window.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            const delta = e.clientX - startX;
+            
+            if (delta > 150) finalizeHabit(true);
+            else if (delta < -150) finalizeHabit(false);
+            else {
+                card.style.transform = 'none';
+                yesIndicator.style.opacity = 0;
+                noIndicator.style.opacity = 0;
+            }
+        });
+
+        function finalizeHabit(value) {
+            const habit = habits[currentHabitIndex];
+            matrixData[habit.id] = value;
+            
+            currentHabitIndex++;
+            if (currentHabitIndex < habits.length) {
+                // Load Next
+                const next = habits[currentHabitIndex];
+                document.getElementById('habit-name').innerText = next.name;
+                document.getElementById('habit-icon').innerText = next.icon;
+                card.style.transform = 'none';
+                yesIndicator.style.opacity = 0;
+                noIndicator.style.opacity = 0;
+            } else {
+                // Show Weight or Finish
+                card.style.display = 'none';
+                if (needsWeight) {
+                    document.getElementById('weight-card').style.display = 'flex';
+                } else {
+                    submitMatrix();
+                }
+            }
+        }
+
+        async function submitMatrix() {
+            // 1. Log Habits
+            await fetch('/matrix/log-habits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(matrixData)
             });
 
-            requestAnimationFrame(animateHUD);
-        }
-
-        window.addEventListener('resize', resize);
-        initHUD();
-
-        async function sendChat(isVoice = false) {
-            const input = document.getElementById('user-input');
-            const text = input.value;
-            if (!text) return;
-            
-            appendMessage('USER', text);
-            input.value = '';
-
-            try {
-                const response = await fetch('/chat', {
+            // 2. Log Weight if provided
+            const wInput = document.getElementById('weight-input');
+            if (wInput && wInput.value) {
+                await fetch('/matrix/log-weight', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        text: text,
-                        voice_mode: isVoice || voiceModeActive 
-                    })
+                    body: JSON.stringify({ weight: wInput.value })
                 });
-                
-                const data = await response.json();
-                appendMessage('JARVIS', data.speech, data.thought, data.command);
-                
-                // --- Browser TTS (Only if voice mode was used) ---
-                if (data.speech && (isVoice || voiceModeActive)) {
-                    const utterance = new SpeechSynthesisUtterance(data.speech);
-                    utterance.rate = 1.0;
-                    utterance.pitch = 1.0;
-                    const voices = window.speechSynthesis.getVoices();
-                    const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Male'));
-                    if (preferredVoice) utterance.voice = preferredVoice;
-                    window.speechSynthesis.speak(utterance);
-                }
-                
-                // Reset flag for next interaction
-                voiceModeActive = false;
-            } catch (e) {
-                appendMessage('SYSTEM', 'Link to brain severed.');
             }
+
+            // 3. Hide Overlay
+            document.getElementById('swipe-overlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('swipe-overlay').style.display = 'none';
+                appendMessage('JARVIS', 'Matrix Sync Complete. Physical metrics updated.');
+            }, 500);
         }
 
-        function appendMessage(role, text, thought = '', command = '') {
+        // --- Basic Chat Logic ---
+        function appendMessage(role, text) {
             const feed = document.getElementById('chat-feed');
             const card = document.createElement('div');
             card.className = 'hologram-card';
-            
-            if (role === 'USER') {
-                card.style.alignSelf = 'flex-end';
-                card.style.borderColor = 'var(--stark-blue)';
-                card.style.background = 'rgba(0, 210, 255, 0.05)';
-            }
-            
-            let html = '';
-            if (thought) html += `<div class="thought-bubble">🧠 ${thought}</div>`;
-            html += `<div>${text}</div>`;
-            
-            card.innerHTML = html;
-            
-            if (command) {
-                const cmdContainer = document.createElement('div');
-                cmdContainer.style.marginTop = '15px';
-                cmdContainer.style.background = 'rgba(0,0,0,0.3)';
-                cmdContainer.style.padding = '10px';
-                cmdContainer.style.borderRadius = '10px';
-                cmdContainer.style.fontFamily = 'monospace';
-                cmdContainer.style.fontSize = '12px';
-                cmdContainer.style.border = '1px dashed var(--bumble-yellow)';
-                cmdContainer.innerHTML = `# PROPOSED COMMAND:<br>${command}`;
-                
-                const execBtn = document.createElement('button');
-                execBtn.innerText = 'EXECUTE';
-                execBtn.style.marginTop = '10px';
-                execBtn.style.background = 'var(--bumble-yellow)';
-                execBtn.style.border = 'none';
-                execBtn.style.padding = '8px 20px';
-                execBtn.style.borderRadius = '12px';
-                execBtn.style.fontWeight = '700';
-                execBtn.style.cursor = 'pointer';
-                execBtn.style.fontSize = '12px';
-                
-                execBtn.onclick = (e) => executeCommand(command, e.target);
-                
-                card.appendChild(cmdContainer);
-                card.appendChild(execBtn);
-            }
-            
+            card.innerText = text;
             feed.appendChild(card);
             feed.scrollTop = feed.scrollHeight;
         }
 
-        async function executeCommand(cmd, btn) {
-            if (btn) btn.classList.add('btn-loading');
-            try {
-                const response = await fetch('/execute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command: cmd })
-                });
-                const data = await response.json();
-                appendMessage('SYSTEM', 'Execution Output:', '', data.output);
-            } catch (e) {
-                appendMessage('SYSTEM', 'Execution failed.');
-            } finally {
-                if (btn) btn.classList.remove('btn-loading');
-            }
+        async function sendChat() {
+            const input = document.getElementById('user-input');
+            if (!input.value) return;
+            appendMessage('USER', input.value);
+            input.value = '';
         }
-
-        // Enter key listener
-        document.getElementById('user-input').addEventListener('keypress', e => e.key === 'Enter' && sendChat());
     </script>
 </body>
 </html>
