@@ -4,6 +4,8 @@ import subprocess
 import os
 import asyncio
 import requests
+
+import re
 from src.team.personas import Personas
 from src.brain import Brain
 from src.notifier import Notifier
@@ -39,7 +41,6 @@ class TeamManager:
             current_mission = leader_briefing["speech"].split("MISSION:")[1].split("\n")[0].strip()
         
         # Create a unique branch for this mission
-        import re
         mission_id = current_mission.lower().replace(" ", "-")
         mission_id = re.sub(r'[^a-z0-9-]', '', mission_id)[:20]
         mission_id = re.sub(r'-+', '-', mission_id).strip("-")
@@ -49,15 +50,20 @@ class TeamManager:
 
         print(f"🎯 [TEAM] Current Mission: {current_mission} (Branch: {self.branch_name})")
 
-        # 2. Sequential Execution (Teammates collaborating)
+        # 2. Sequential Execution (Teammates collaborating on the mission)
         await self.role_action("DESIGNER", f"Mission: {current_mission}. Design the visual components.")
         await self.role_action("BACKEND", f"Mission: {current_mission}. Implement the core logic and run commands to create/edit files.")
         await self.role_action("FRONTEND", f"Mission: {current_mission}. Implement the UI templates and run commands to save them.")
         
-        # 3. Infrastructure Check
-        await self.role_action("INFRA", f"Mission: {current_mission}. Verify the build locally (ruff, pytest). Ensure .github/workflows and vercel.json are correct for this mission.")
+        # 3. Infrastructure & Monitoring Check
+        infra_report = await self.role_action("INFRA", f"Mission: {current_mission}. Verify build stability and ensure CI/CD monitoring is active. If previous deployments failed or errors were detected, create a recovery script or diagnostic command.")
 
         # 4. Final Leader Review & Push
+        # If Infra detected a critical blocker, Leader asks for a fix before pushing
+        if "blocker" in infra_report.get("speech", "").lower() or "fail" in infra_report.get("speech", "").lower():
+             print("[!] INFRA detected a potential blocker. Requesting emergency recovery logic...")
+             await self.role_action("INFRA", "CRITICAL: The build or deployment is unstable. Generate a specific shell command to fix the infrastructure or provide a rollback script immediately.")
+
         await self.role_action("LEADER", f"Mission complete: {current_mission}. Finalizing build.")
         self._sync_and_push(current_mission)
 
@@ -97,7 +103,6 @@ class TeamManager:
 
             if ai_response.get('command'):
                 print(f"[*] [{role}] Executing: {ai_response['command']}")
-                # RE-ENABLED EXECUTOR FOR AUTONOMOUS BUILDING
                 exec_result = executor.execute(ai_response['command'])
                 print(f"[#] Result: {exec_result}")
 
@@ -163,8 +168,12 @@ class TeamManager:
             url = remote_info.stdout.strip()
             repo_path = url.split("github.com/")[1].replace(".git", "")
             owner, repo = repo_path.split("/")
+<<<<<<< HEAD
             if ":" in owner:
                 owner = owner.split(":")[-1]
+=======
+            if ":" in owner: owner = owner.split(":")[-1]
+>>>>>>> 612537b (🤖 Evolution: General Improvements)
         except Exception as e:
             print(f"[!] PR Error parsing remote: {e}")
             return
