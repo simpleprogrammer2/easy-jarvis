@@ -169,7 +169,8 @@ class TeamManager:
             repo_path = url.split("github.com/")[1].replace(".git", "")
             owner, repo = repo_path.split("/")
 
-            if ":" in owner: owner = owner.split(":")[-1]
+            if ":" in owner:
+                owner = owner.split(":")[-1]
         except Exception as e:
             print(f"[!] PR Error parsing remote: {e}")
             return

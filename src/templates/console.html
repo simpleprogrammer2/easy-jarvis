@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>easy-jarvis | Cinematic Console</title>
+    <title>easy-jarvis | AG-UI Cinematic Console</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --bumble-yellow: #FFD200;
@@ -14,6 +14,7 @@
             --hud-glow: rgba(255, 210, 0, 0.15);
             --danger-red: #ff4b2b;
             --success-green: #00ff88;
+            --thought-blue: #00a8ff;
         }
         
         body {
@@ -47,6 +48,26 @@
             backdrop-filter: blur(10px);
         }
 
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-green);
+            box-shadow: 0 0 10px var(--success-green);
+        }
+
+        .status-dot.thinking { background: var(--stark-blue); box-shadow: 0 0 10px var(--stark-blue); animation: pulse 1s infinite; }
+        .status-dot.error { background: var(--danger-red); box-shadow: 0 0 10px var(--danger-red); }
+
         .arc-reactor {
             width: 50px;
             height: 50px;
@@ -57,6 +78,12 @@
             cursor: pointer;
         }
 
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
         .chat-container {
             flex-grow: 1;
             overflow-y: auto;
@@ -64,6 +91,28 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        /* --- AG-UI Protocol Components --- */
+        .ag-msg {
+            max-width: 85%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .thought-bubble {
+            font-size: 11px;
+            color: var(--thought-blue);
+            background: rgba(0, 168, 255, 0.05);
+            border-left: 2px solid var(--thought-blue);
+            padding: 8px 15px;
+            font-style: italic;
+            border-radius: 0 10px 10px 0;
         }
 
         .hologram-card {
@@ -72,8 +121,59 @@
             border-radius: 20px;
             padding: 20px;
             backdrop-filter: blur(5px);
-            max-width: 80%;
             position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .hologram-card.user {
+            align-self: flex-end;
+            background: rgba(255, 210, 0, 0.1);
+            border-color: rgba(255, 210, 0, 0.3);
+            border-radius: 20px 20px 0 20px;
+        }
+
+        .command-card {
+            background: #1a1a1c;
+            border: 1px solid rgba(255, 210, 0, 0.5);
+            border-radius: 12px;
+            padding: 15px;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .command-header {
+            font-size: 9px;
+            color: var(--bumble-yellow);
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .exec-btn {
+            background: var(--bumble-yellow);
+            color: black;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-weight: 700;
+            font-size: 10px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        .exec-btn:hover { transform: translateY(-2px); box-shadow: 0 0 10px var(--bumble-yellow); }
+
+        .output-block {
+            background: black;
+            color: var(--success-green);
+            padding: 10px;
+            font-size: 11px;
+            border-radius: 5px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #333;
         }
 
         /* --- Swipe Overlay --- */
@@ -141,6 +241,7 @@
         .footer {
             padding: 20px;
             background: rgba(0, 0, 0, 0.8);
+            border-top: 1px solid rgba(255, 210, 0, 0.1);
         }
 
         .input-group {
@@ -158,7 +259,9 @@
             padding: 15px 25px;
             color: white;
             outline: none;
+            font-family: inherit;
         }
+        input:focus { border-color: var(--bumble-yellow); background: rgba(255, 255, 255, 0.1); }
     </style>
 </head>
 <body>
@@ -190,23 +293,57 @@
     <div class="header">
         <div>
             <div style="font-weight: 700; font-size: 18px; letter-spacing: 2px;">EASY-JARVIS</div>
-            <div style="font-size: 10px; color: var(--bumble-yellow);">SYSTEM STATUS: ONLINE</div>
+            <div class="status-badge">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">SYSTEM ONLINE</span>
+            </div>
         </div>
         <div class="arc-reactor" id="arc-reactor"></div>
     </div>
 
     <div class="chat-container" id="chat-feed">
-        <div class="hologram-card">I am awake, simpleprogrammer. Life Matrix sync pending.</div>
+        <div class="ag-msg">
+            <div class="hologram-card">I am awake, simpleprogrammer. Life Matrix sync pending.</div>
+        </div>
     </div>
 
     <div class="footer">
         <div class="input-group">
-            <input type="text" id="user-input" placeholder="Type a command...">
-            <button onclick="sendChat()" style="background:var(--bumble-yellow); border:none; border-radius:50%; width:50px; height:50px; cursor:pointer;">🚀</button>
+            <input type="text" id="user-input" placeholder="Type a command..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendChat()" id="send-btn" style="background:var(--bumble-yellow); border:none; border-radius:50%; width:50px; height:50px; cursor:pointer;">🚀</button>
         </div>
     </div>
 
     <script>
+        // --- HUD Background Animation ---
+        const canvas = document.getElementById('hud-canvas');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let rotation = 0;
+        function drawHUD() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#FFD200';
+            ctx.lineWidth = 1;
+            
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            
+            rotation += 0.005;
+
+            // Circles
+            for(let i=1; i<=3; i++) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, 100 * i, rotation * (i % 2 ? 1 : -1), rotation * (i % 2 ? 1 : -1) + Math.PI * 1.5);
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(drawHUD);
+        }
+        drawHUD();
+
         // --- Habits Sequence ---
         const habits = [
             { id: 'no_phone', name: 'NO PHONE', icon: '📱', hint: 'Morning scroll resisted?' },
@@ -219,6 +356,11 @@
         const matrixData = {};
         const needsWeight = {{ 'true' if needs_weight else 'false' }};
 
+        if (!needsWeight && currentHabitIndex === 0 && !localStorage.getItem('matrix_synced_today')) {
+            // Already synced or not needed?
+            document.getElementById('swipe-overlay').style.display = 'none';
+        }
+
         // --- Swipe Logic ---
         const card = document.getElementById('current-swipe-card');
         const yesIndicator = card.querySelector('.yes');
@@ -227,19 +369,26 @@
         let isDragging = false;
 
         card.addEventListener('mousedown', (e) => { startX = e.clientX; isDragging = true; });
-        window.addEventListener('mousemove', (e) => {
+        card.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; isDragging = true; });
+
+        window.addEventListener('mousemove', (e) => handleDrag(e.clientX));
+        window.addEventListener('touchmove', (e) => handleDrag(e.touches[0].clientX));
+
+        function handleDrag(currentX) {
             if (!isDragging) return;
-            const delta = e.clientX - startX;
+            const delta = currentX - startX;
             card.style.transform = `translateX(${delta}px) rotate(${delta * 0.05}deg)`;
-            
             yesIndicator.style.opacity = delta > 50 ? (delta - 50) / 100 : 0;
             noIndicator.style.opacity = delta < -50 ? (-delta - 50) / 100 : 0;
-        });
+        }
 
-        window.addEventListener('mouseup', (e) => {
+        window.addEventListener('mouseup', (e) => handleEnd(e.clientX));
+        window.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX));
+
+        function handleEnd(endX) {
             if (!isDragging) return;
             isDragging = false;
-            const delta = e.clientX - startX;
+            const delta = endX - startX;
             
             if (delta > 150) finalizeHabit(true);
             else if (delta < -150) finalizeHabit(false);
@@ -248,7 +397,7 @@
                 yesIndicator.style.opacity = 0;
                 noIndicator.style.opacity = 0;
             }
-        });
+        }
 
         function finalizeHabit(value) {
             const habit = habits[currentHabitIndex];
@@ -256,7 +405,6 @@
             
             currentHabitIndex++;
             if (currentHabitIndex < habits.length) {
-                // Load Next
                 const next = habits[currentHabitIndex];
                 document.getElementById('habit-name').innerText = next.name;
                 document.getElementById('habit-icon').innerHTML = `<div class="habit-icon-large">${next.icon}</div>`;
@@ -264,7 +412,6 @@
                 yesIndicator.style.opacity = 0;
                 noIndicator.style.opacity = 0;
             } else {
-                // Show Weight or Finish
                 card.style.display = 'none';
                 if (needsWeight) {
                     document.getElementById('weight-card').style.display = 'flex';
@@ -275,47 +422,138 @@
         }
 
         async function submitMatrix() {
-            // 1. Log Habits
-            await fetch('/matrix/log-habits', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(matrixData)
-            });
-
-            // 2. Log Weight if provided
-            const wInput = document.getElementById('weight-input');
-            if (wInput && wInput.value) {
-                await fetch('/matrix/log-weight', {
+            try {
+                await fetch('/matrix/log-habits', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ weight: wInput.value })
+                    body: JSON.stringify(matrixData)
                 });
-            }
 
-            // 3. Hide Overlay
+                const wInput = document.getElementById('weight-input');
+                if (wInput && wInput.value) {
+                    await fetch('/matrix/log-weight', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ weight: wInput.value })
+                    });
+                }
+                localStorage.setItem('matrix_synced_today', new Date().toDateString());
+            } catch(e) {}
+
             document.getElementById('swipe-overlay').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('swipe-overlay').style.display = 'none';
-                // Jarvis remains silent as per user request ("no remark")
             }, 500);
         }
 
-        // --- Basic Chat Logic ---
-        function appendMessage(role, text) {
+        // --- AG-UI Core Logic ---
+        function setStatus(status) {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            dot.className = 'status-dot';
+            
+            if (status === 'Thinking') {
+                dot.classList.add('thinking');
+                text.innerText = 'Analyzing Data...';
+            } else if (status === 'Error') {
+                dot.classList.add('error');
+                text.innerText = 'System Snag';
+            } else {
+                text.innerText = 'System Online';
+            }
+        }
+
+        function appendAGMessage(data) {
             const feed = document.getElementById('chat-feed');
+            const msgWrap = document.createElement('div');
+            msgWrap.className = 'ag-msg';
+
+            // 1. Thought (Internal reasoning)
+            if (data.thought) {
+                const t = document.createElement('div');
+                t.className = 'thought-bubble';
+                t.innerText = data.thought;
+                msgWrap.appendChild(t);
+            }
+
+            // 2. Speech (User response)
             const card = document.createElement('div');
             card.className = 'hologram-card';
-            card.innerText = text;
-            feed.appendChild(card);
+            card.innerText = data.speech || "...";
+            msgWrap.appendChild(card);
+
+            // 3. Command (Actionable component)
+            if (data.command) {
+                const cmd = document.createElement('div');
+                cmd.className = 'command-card';
+                cmd.innerHTML = `
+                    <div class="command-header">ACTIONABLE COMMAND</div>
+                    <div>$ ${data.command}</div>
+                    <button class="exec-btn" onclick="executeCommand(this, '${data.command.replace(/'/g, "\\'")}')">RUN ACTION</button>
+                    <div class="output-wrap"></div>
+                `;
+                msgWrap.appendChild(cmd);
+            }
+
+            feed.appendChild(msgWrap);
             feed.scrollTop = feed.scrollHeight;
         }
 
         async function sendChat() {
             const input = document.getElementById('user-input');
-            if (!input.value) return;
-            appendMessage('USER', input.value);
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Show User message
+            const feed = document.getElementById('chat-feed');
+            const userCard = document.createElement('div');
+            userCard.className = 'hologram-card user';
+            userCard.style.alignSelf = 'flex-end';
+            userCard.innerText = text;
+            feed.appendChild(userCard);
+            
             input.value = '';
+            setStatus('Thinking');
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                const data = await response.json();
+                setStatus('Online');
+                appendAGMessage(data);
+            } catch (e) {
+                setStatus('Error');
+                appendAGMessage({ speech: "Sir, I'm having trouble connecting to my cognitive core.", thought: e.message });
+            }
         }
+
+        async function executeCommand(btn, command) {
+            btn.disabled = true;
+            btn.innerText = "EXECUTING...";
+            const wrap = btn.parentElement.querySelector('.output-wrap');
+            wrap.innerHTML = '<div class="output-block">[*] Processing command...</div>';
+
+            try {
+                const response = await fetch('/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command })
+                });
+                const data = await response.json();
+                wrap.innerHTML = `<div class="output-block">${data.output.replace(/\n/g, '<br>')}</div>`;
+                btn.innerText = "SUCCESS";
+                btn.style.background = 'var(--success-green)';
+            } catch (e) {
+                wrap.innerHTML = `<div class="output-block" style="color: var(--danger-red)">[!] Error: ${e.message}</div>`;
+                btn.innerText = "FAILED";
+                btn.style.background = 'var(--danger-red)';
+            }
+        }
+
+        function handleKeyPress(e) { if (e.key === 'Enter') sendChat(); }
     </script>
 </body>
 </html>

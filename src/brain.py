@@ -23,11 +23,17 @@ class Brain:
         3. Be a Teacher: Briefly explain your logic.
         4. Multi-turn Chat: Remember previous context to guide the user.
         
-        OUTPUT FORMAT (STRICT JSON):
+        AG-UI PROTOCOL (STRICT JSON):
         {
+            "version": "1.0",
+            "status": "Online | Thinking | Executing | Error",
             "speech": "What you say back",
+            "thought": "Proactive safety/logic reasoning",
             "command": "Shell command or null",
-            "thought": "Proactive safety/logic reasoning"
+            "ui": {
+                "type": "none | card | graph | progress",
+                "props": {} 
+            }
         }
         """
         
@@ -58,21 +64,14 @@ class Brain:
         # 1. Attempt Local First
         local_result = await self._process_local(user_input)
 
-        # 2. If local succeeded AND it wasn't a timeout/error, return it
-        if "offline" not in local_result.get("speech", "").lower() and "trouble thinking" not in local_result.get("speech", "").lower():
+        # 2. If local succeeded AND it wasn't an Error, return it
+        if local_result.get("status") != "Error":
             return local_result
 
         # 3. Fallback to Gemini if Local failed
         if self.gemini_ready:
             print("[*] Local LLM struggled. Attempting Gemini Cloud fallback...")
-            gemini_result = await self._process_gemini(user_input)
-
-            # 4. Handle Gemini Quota/Error fallback
-            if "snag with the cloud" in gemini_result.get("speech", ""):
-                print("[!] Gemini failed (Quota or Error). Returning local error as last resort.")
-                return local_result
-
-            return gemini_result
+            return await self._process_gemini(user_input)
 
         return local_result
 
@@ -102,17 +101,23 @@ class Brain:
             if "text/html" in response.headers.get("Content-Type", ""):
                 print(f"[!] Local Brain is OFFLINE (HTML response from {self.local_url})")
                 return {
+                    "version": "1.0",
+                    "status": "Error",
                     "speech": "Sir, my remote brain is currently offline.",
                     "command": None,
-                    "thought": "Ngrok returned HTML instead of JSON. The Colab server is likely stopped."
+                    "thought": "Ngrok returned HTML instead of JSON. The Colab server is likely stopped.",
+                    "ui": {"type": "none"}
                 }
 
             if response.status_code != 200:
                 print(f"[!] Local Brain Error {response.status_code}: {response.text}")
                 return {
+                    "version": "1.0",
+                    "status": "Error",
                     "speech": "I'm having a connection issue with my local brain.",
                     "command": None,
-                    "thought": f"Server Error {response.status_code}"
+                    "thought": f"Server Error {response.status_code}",
+                    "ui": {"type": "none"}
                 }
                 
             data = response.json()
@@ -125,20 +130,37 @@ class Brain:
 
             try:
                 return json.loads(content)
-            except:
-                return {"speech": content, "command": None, "thought": "Plain text response."}
+            except Exception:
+                return {
+                    "version": "1.0",
+                    "status": "Online",
+                    "speech": content, 
+                    "command": None, 
+                    "thought": "Plain text response.",
+                    "ui": {"type": "none"}
+                }
         except Exception as e:
             print(f"[!] Local Brain Connection Error: {e}")
             return {
+                "version": "1.0",
+                "status": "Error",
                 "speech": "I'm having trouble thinking locally. The local model is taking too long to respond.",
                 "command": None,
-                "thought": f"Connection Error: {str(e)}"
+                "thought": f"Connection Error: {str(e)}",
+                "ui": {"type": "none"}
             }
 
     async def _process_gemini(self, user_input: str):
         """Handles inference via Google Gemini API with ultra-aggressive pacing."""
         if not self.gemini_ready:
-            return {"speech": "Gemini not configured.", "command": None, "thought": "API key missing."}
+            return {
+                "version": "1.0",
+                "status": "Error",
+                "speech": "Gemini not configured.", 
+                "command": None, 
+                "thought": "API key missing.",
+                "ui": {"type": "none"}
+            }
             
         max_retries = 2
         for attempt in range(max_retries + 1):
@@ -183,9 +205,12 @@ class Brain:
                     thought = f"Gemini API Error: {error_msg}"
                     
                 return {
+                    "version": "1.0",
+                    "status": "Error",
                     "speech": "I've hit a slight cognitive snag with the cloud.",
                     "command": None,
-                    "thought": thought
+                    "thought": thought,
+                    "ui": {"type": "none"}
                 }
 
 if __name__ == "__main__":
