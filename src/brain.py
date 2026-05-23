@@ -9,6 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Brain:
+    @staticmethod
+    def create_brain():
+        return Brain()
+
     def __init__(self, mode="local"):
         self.mode = mode # "local" or "gemini"
         self.local_url = os.getenv("LOCAL_LLM_URL", "http://local-llm:8080/v1/chat/completions")
