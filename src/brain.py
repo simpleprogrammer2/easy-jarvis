@@ -54,7 +54,7 @@ class Brain:
         """Processes user input with a 'Local-First' priority and intelligent fallback."""
         print(f"[*] easy-jarvis Brain: Processing '{user_input}'...")
 
-        is_important = self._is_important(user_input)
+        #is_important=self._is_important(user_input)
 
         # 1. Attempt Local First (Always respect 'local model first' request)
         local_result = await self._process_local(user_input)
