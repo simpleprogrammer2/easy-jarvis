@@ -1,51 +1,58 @@
 import pytest
-from unittest.mock import MagicMock, patch
+import json
+from unittest.mock import MagicMock, patch, AsyncMock
 from src.brain import Brain
 
 @pytest.fixture
-def mock_brain_deps():
-    with patch('google.generativeai.GenerativeModel') as mock_model:
-        with patch('google.generativeai.configure'):
-            # Setup mock chat
-            mock_chat = MagicMock()
-            mock_model.return_value.start_chat.return_value = mock_chat
-            yield mock_model, mock_chat
+def mock_brain_client():
+    with patch('src.brain.genai.Client') as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        yield mock_client
 
-def test_brain_initialization(mock_brain_deps):
-    mock_model, mock_chat = mock_brain_deps
+def test_brain_initialization(mock_brain_client):
     with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
         brain = Brain()
-        assert brain.model is not None
-        mock_model.return_value.start_chat.assert_called_once()
-        mock_chat.send_message.assert_called_once() # System prompt
+        assert brain.client is not None
+        assert brain.gemini_ready is True
 
 @pytest.mark.asyncio
-async def test_brain_process_command(mock_brain_deps):
-    mock_model, mock_chat = mock_brain_deps
-    # Mock the API response for the user message
-    mock_response = MagicMock()
-    mock_response.text = '{"speech": "Hello!", "command": "ls", "thought": "user wants to list files"}'
-    # The first call is system prompt, second is the actual message
-    mock_chat.send_message.side_effect = [MagicMock(), mock_response]
+async def test_brain_process_command(mock_brain_client):
+    # Mock local LLM to succeed and not hit network
+    with patch('requests.post') as mock_post:
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'choices': [{'message': {'content': json.dumps({
+                "speech": "Hello!", "command": "ls", "thought": "user wants to list files"
+            })}}]
+        }
+        mock_post.return_value = mock_response
 
-    with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
-        brain = Brain()
-        result = await brain.process_command("hi")
-        
-        assert result['speech'] == "Hello!"
-        assert result['command'] == "ls"
-        assert "user wants to list files" in result['thought']
+        with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
+            brain = Brain()
+            # Force local mode via initialization
+            result = await brain.process_command("hi")
+            
+            assert result['speech'] == "Hello!"
+            assert result['command'] == "ls"
+            assert "user wants to list files" in result['thought']
 
 @pytest.mark.asyncio
-async def test_brain_error_handling(mock_brain_deps):
-    mock_model, mock_chat = mock_brain_deps
-    # System prompt succeeds, user message fails
-    mock_chat.send_message.side_effect = [MagicMock(), Exception("API Error")]
+async def test_brain_error_handling(mock_brain_client):
+    # Mock local LLM to fail
+    with patch('requests.post', side_effect=Exception("Local LLM failed")):
+        # Mock Gemini success
+        mock_gemini_response = MagicMock()
+        mock_gemini_response.text = json.dumps({
+            "speech": "Hello from Gemini!", 
+            "command": "ls", 
+            "thought": "Gemini fallback success"
+        })
+        mock_brain_client.models.generate_content.return_value = mock_gemini_response
 
-    with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
-        brain = Brain()
-        result = await brain.process_command("hi")
-        
-        assert "cognitive snag" in result['speech']
-        assert result['command'] is None
-        assert "API Error" in result['thought']
+        with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
+            brain = Brain()
+            result = await brain.process_command("hi")
+            
+            assert result['speech'] == "Hello from Gemini!"
+            assert result['command'] == "ls"

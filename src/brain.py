@@ -36,7 +36,7 @@ class Brain:
         if api_key:
             try:
                 self.client = genai.Client(api_key=api_key)
-                self.gemini_model_name = 'gemini-2.0-flash'
+                self.gemini_model_name = 'gemini-1.5-flash-8b'
                 self.gemini_ready = True
             except Exception as e:
                 print(f"[!] Gemini Init Warning: {e}")
@@ -53,8 +53,6 @@ class Brain:
     async def process_command(self, user_input: str):
         """Processes user input with a 'Local-First' priority and intelligent fallback."""
         print(f"[*] easy-jarvis Brain: Processing '{user_input}'...")
-
-        is_important = self._is_important(user_input)
 
         # 1. Attempt Local First (Always respect 'local model first' request)
         local_result = await self._process_local(user_input)
@@ -103,7 +101,7 @@ class Brain:
             # Attempt to parse JSON, if it fails, treat as plain speech
             try:
                 return json.loads(content)
-            except:
+            except Exception:
                 return {
                     "speech": content,
                     "command": None,
