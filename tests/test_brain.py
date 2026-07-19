@@ -1,51 +1,59 @@
 import pytest
+import json
 from unittest.mock import MagicMock, patch
 from src.brain import Brain
 
 @pytest.fixture
 def mock_brain_deps():
-    with patch('google.generativeai.GenerativeModel') as mock_model:
-        with patch('google.generativeai.configure'):
-            # Setup mock chat
-            mock_chat = MagicMock()
-            mock_model.return_value.start_chat.return_value = mock_chat
-            yield mock_model, mock_chat
+    # Patch the new genai.Client
+    with patch('google.genai.Client') as mock_client:
+        # Setup mock generate_content
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "speech": "Hello!",
+            "command": "ls",
+            "thought": "Mocking response"
+        })
+        mock_client.return_value.models.generate_content.return_value = mock_response
+        yield mock_client
 
-def test_brain_initialization(mock_brain_deps):
-    mock_model, mock_chat = mock_brain_deps
+@pytest.mark.asyncio
+async def test_brain_initialization(mock_brain_deps):
+    mock_client = mock_brain_deps
     with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
         brain = Brain()
-        assert brain.model is not None
-        mock_model.return_value.start_chat.assert_called_once()
-        mock_chat.send_message.assert_called_once() # System prompt
+        # In new Brain, we don't start chat on init, we just configure client
+        assert brain.gemini_ready is True
+        assert brain.client is not None
 
 @pytest.mark.asyncio
 async def test_brain_process_command(mock_brain_deps):
-    mock_model, mock_chat = mock_brain_deps
-    # Mock the API response for the user message
-    mock_response = MagicMock()
-    mock_response.text = '{"speech": "Hello!", "command": "ls", "thought": "user wants to list files"}'
-    # The first call is system prompt, second is the actual message
-    mock_chat.send_message.side_effect = [MagicMock(), mock_response]
-
-    with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
-        brain = Brain()
-        result = await brain.process_command("hi")
+    mock_client = mock_brain_deps
+    # Mock local LLM failure to trigger Gemini fallback in test
+    with patch('requests.post') as mock_post:
+        mock_post.return_value.status_code = 400 # Trigger fallback
         
-        assert result['speech'] == "Hello!"
-        assert result['command'] == "ls"
-        assert "user wants to list files" in result['thought']
+        with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
+            brain = Brain()
+            # Process command triggers fallback to Gemini
+            result = await brain.process_command("hi")
+            
+            assert result['speech'] == "Hello!"
+            assert result['command'] == "ls"
+            assert "Mocking response" in result['thought']
 
 @pytest.mark.asyncio
 async def test_brain_error_handling(mock_brain_deps):
-    mock_model, mock_chat = mock_brain_deps
-    # System prompt succeeds, user message fails
-    mock_chat.send_message.side_effect = [MagicMock(), Exception("API Error")]
-
-    with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
-        brain = Brain()
-        result = await brain.process_command("hi")
+    mock_client = mock_brain_deps
+    mock_client.return_value.models.generate_content.side_effect = Exception("API Error")
+    
+    with patch('requests.post') as mock_post:
+        mock_post.return_value.status_code = 400 # Trigger fallback
         
-        assert "cognitive snag" in result['speech']
-        assert result['command'] is None
-        assert "API Error" in result['thought']
+        with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
+            brain = Brain()
+            result = await brain.process_command("hi")
+            
+            assert "cognitive snag" in result['speech']
+            assert result['command'] is None
+            assert "API Error" in result['thought']
