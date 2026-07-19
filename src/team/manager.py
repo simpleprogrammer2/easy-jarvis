@@ -4,7 +4,6 @@ import subprocess
 import os
 import asyncio
 import requests
-
 import re
 from src.team.personas import Personas
 from src.brain import Brain
@@ -163,13 +162,15 @@ class TeamManager:
             print("[!] PR Error: GITHUB_TOKEN not set.")
             return
 
+        # Get repo owner and name from git remote
         try:
             remote_info = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True)
             url = remote_info.stdout.strip()
+            # Handle both https and ssh formats
             repo_path = url.split("github.com/")[1].replace(".git", "")
             owner, repo = repo_path.split("/")
-
-            if ":" in owner: owner = owner.split(":")[-1]
+            if ":" in owner:
+                owner = owner.split(":")[-1] # Handle x-access-token format
         except Exception as e:
             print(f"[!] PR Error parsing remote: {e}")
             return

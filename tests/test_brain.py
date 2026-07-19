@@ -19,7 +19,6 @@ def mock_brain_deps():
 
 @pytest.mark.asyncio
 async def test_brain_initialization(mock_brain_deps):
-    mock_client = mock_brain_deps
     with patch.dict('os.environ', {'GEMINI_API_KEY': 'test-key'}):
         brain = Brain()
         # In new Brain, we don't start chat on init, we just configure client
@@ -28,7 +27,6 @@ async def test_brain_initialization(mock_brain_deps):
 
 @pytest.mark.asyncio
 async def test_brain_process_command(mock_brain_deps):
-    mock_client = mock_brain_deps
     # Mock local LLM failure to trigger Gemini fallback in test
     with patch('requests.post') as mock_post:
         mock_post.return_value.status_code = 400 # Trigger fallback
@@ -54,6 +52,6 @@ async def test_brain_error_handling(mock_brain_deps):
             brain = Brain()
             result = await brain.process_command("hi")
             
-            assert "cognitive snag" in result['speech']
+            assert "connection issue" in result['speech']
             assert result['command'] is None
-            assert "API Error" in result['thought']
+            assert "Server Error 400" in result['thought']
