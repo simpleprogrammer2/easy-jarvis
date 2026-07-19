@@ -73,10 +73,14 @@ class MatrixManager:
                         d = datetime.date.fromisoformat(parts[0])
                         if d >= start_date:
                             days_tracked += 1
-                            if '✅' in parts[1]: habits_count["no_phone"] += 1
-                            if '✅' in parts[2]: habits_count["read_book"] += 1
-                            if '✅' in parts[3]: habits_count["exercise"] += 1
-                            if '✅' in parts[4]: habits_count["meditation"] += 1
+                            if '✅' in parts[1]:
+                                habits_count["no_phone"] += 1
+                            if '✅' in parts[2]:
+                                habits_count["read_book"] += 1
+                            if '✅' in parts[3]:
+                                habits_count["exercise"] += 1
+                            if '✅' in parts[4]:
+                                habits_count["meditation"] += 1
                 
                 report += "**Habit Compliance (Last 7 Days):**\n"
                 report += f"- 📱 No Phone: {habits_count['no_phone']}/{days_tracked}\n"

@@ -59,7 +59,9 @@ class Brain:
         local_result = await self._process_local(user_input)
 
         # 2. If local succeeded AND it wasn't a timeout/error, return it
-        if "offline" not in local_result.get("speech", "").lower() and "trouble thinking" not in local_result.get("speech", "").lower():
+        if "offline" not in local_result.get("speech", "").lower() and \
+           "trouble thinking" not in local_result.get("speech", "").lower() and \
+           "connection issue" not in local_result.get("speech", "").lower():
             return local_result
 
         # 3. Fallback to Gemini if Local failed
@@ -125,7 +127,7 @@ class Brain:
 
             try:
                 return json.loads(content)
-            except:
+            except Exception:
                 return {"speech": content, "command": None, "thought": "Plain text response."}
         except Exception as e:
             print(f"[!] Local Brain Connection Error: {e}")
