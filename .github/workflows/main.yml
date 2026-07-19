@@ -28,5 +28,7 @@ jobs:
       run: |
         ruff check --fix .
     - name: Test with pytest
+      env:
+        PYTHONPATH: .
       run: |
         pytest
