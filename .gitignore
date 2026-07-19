@@ -1,2 +1,6 @@
 .env
 life-matrix/
+__pycache__/
+models/
+models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+models/qwen2.5-1.5b-instruct-q4_k_m.gguf
