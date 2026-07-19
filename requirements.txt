@@ -1,7 +1,6 @@
 pytest
 pytest-asyncio
 ruff
-pyaudio
 numpy
 edge-tts
 asyncio

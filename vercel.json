@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "git": {
+    "deploymentEnabled": false
+  },
+  "buildCommand": "python3 -m pip install uv && python3 -m uv pip install -r requirements.txt --target /build",
+  "builds": [
+    {
+      "src": "src/main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/main.py"
+    }
+  ]
+}
