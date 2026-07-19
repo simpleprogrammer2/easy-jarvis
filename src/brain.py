@@ -190,6 +190,11 @@ class Brain:
                     "thought": thought
                 }
 
+class BrainFactory:
+    @staticmethod
+    def create_brain():
+        return Brain()
+
 if __name__ == "__main__":
     async def test():
         b = Brain()
