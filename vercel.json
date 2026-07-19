@@ -3,6 +3,7 @@
   "git": {
     "deploymentEnabled": false
   },
+  "buildCommand": "python3 -m pip install uv && python3 -m uv pip install -r requirements.txt --target /build",
   "builds": [
     {
       "src": "src/main.py",
@@ -14,5 +15,11 @@
       "src": "/(.*)",
       "dest": "src/main.py"
     }
-  ]
+  ],
+  "functions": {
+    "src/main.py": {
+      "memory": 3009,
+      "maxDuration": 300
+    }
+  }
 }
