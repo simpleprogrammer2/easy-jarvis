@@ -2,7 +2,6 @@ import time
 import datetime
 import subprocess
 import os
-import sys
 import asyncio
 
 from src.team.manager import TeamManager
@@ -32,7 +31,7 @@ def _setup_git():
         print(f"[!] Git Setup Error: {e}")
 
 def main():
-    print(f"🚀 easy-jarvis: 24/7 Autonomous-Evolution Runner Active")
+    print("🚀 easy-jarvis: 24/7 Autonomous-Evolution Runner Active")
     _setup_git()
     
     while True:
@@ -40,7 +39,7 @@ def main():
         run_autonomous_cycle()
         
         # Cooldown between task groups to manage API tokens and prevent runaway loops
-        print(f"[*] Task group complete. Standing by for next assignment in 10 minutes...")
+        print("[*] Task group complete. Standing by for next assignment in 10 minutes...")
         time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":

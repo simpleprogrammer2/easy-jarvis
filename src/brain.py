@@ -1,6 +1,9 @@
 import os
 import requests
 import json
+import asyncio
+import logging
+from typing import Dict
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -11,6 +14,7 @@ class Brain:
     def __init__(self, mode="local"):
         self.mode = mode # "local" or "gemini"
         self.local_url = os.getenv("LOCAL_LLM_URL", "http://local-llm:8080/v1/chat/completions")
+        self.memory: Dict = {}
         
         # System instructions
         self.system_prompt = """
@@ -36,13 +40,19 @@ class Brain:
         if api_key:
             try:
                 self.client = genai.Client(api_key=api_key)
-                self.gemini_model_name = 'gemini-2.0-flash'
+                self.gemini_model_name = 'gemini-1.5-flash-8b'
                 self.gemini_ready = True
             except Exception as e:
                 print(f"[!] Gemini Init Warning: {e}")
 
         self.history = []
         self.max_history = 10
+
+    def store_memory(self, key: str, value: any):
+        self.memory[key] = value
+
+    def retrieve_memory(self, key: str) -> any:
+        return self.memory.get(key)
 
     def _is_important(self, text: str) -> bool:
         """Heuristic to determine if a question is 'important' enough for Gemini."""
@@ -54,18 +64,16 @@ class Brain:
         """Processes user input with a 'Local-First' priority and intelligent fallback."""
         print(f"[*] easy-jarvis Brain: Processing '{user_input}'...")
 
-        is_important = self._is_important(user_input)
-
-        # 1. Attempt Local First (Always respect 'local model first' request)
+        # 1. Attempt Local First
         local_result = await self._process_local(user_input)
 
         # 2. If local succeeded AND it wasn't a timeout/error, return it
-        if "trouble thinking locally" not in local_result.get("speech", ""):
-            # If it wasn't important, we are done.
-            # If it WAS important, but local did a good job, we stick with it to save quota.
+        if "offline" not in local_result.get("speech", "").lower() and \
+           "trouble thinking" not in local_result.get("speech", "").lower() and \
+           "connection issue" not in local_result.get("speech", "").lower():
             return local_result
 
-        # 3. Fallback to Gemini if Local failed or timed out
+        # 3. Fallback to Gemini if Local failed
         if self.gemini_ready:
             print("[*] Local LLM struggled. Attempting Gemini Cloud fallback...")
             gemini_result = await self._process_gemini(user_input)
@@ -80,93 +88,125 @@ class Brain:
         return local_result
 
     async def _process_local(self, user_input: str):
-        """Handles inference via local llama.cpp server with increased timeout."""
-        self.history.append({"role": "user", "content": user_input})
-        if len(self.history) > self.max_history * 2:
-            self.history = self.history[-(self.max_history * 2):]
+        """Handles inference via local llama.cpp server with 'Universal Compatibility' format."""
+        messages = []
+        if not self.history:
+            combined_content = f"SYSTEM INSTRUCTIONS:\n{self.system_prompt}\n\nUSER INPUT:\n{user_input}"
+            messages.append({"role": "user", "content": combined_content})
+        else:
+            for h in self.history:
+                messages.append(h)
+            messages.append({"role": "user", "content": user_input})
 
         payload = {
-            "messages": [{"role": "system", "content": self.system_prompt}] + self.history,
+            "model": "gpt-3.5-turbo",
+            "messages": messages,
             "temperature": 0.7,
+            "max_tokens": 512,
+            "stream": False
         }
 
         try:
-            # Increased timeout to 120s for resource-constrained environments
             response = requests.post(self.local_url, json=payload, timeout=120)
-            response.raise_for_status()
+            
+            # Check for Ngrok/HTML error pages
+            if "text/html" in response.headers.get("Content-Type", ""):
+                print(f"[!] Local Brain is OFFLINE (HTML response from {self.local_url})")
+                return {
+                    "speech": "Sir, my remote brain is currently offline.",
+                    "command": None,
+                    "thought": "Ngrok returned HTML instead of JSON. The Colab server is likely stopped."
+                }
+
+            if response.status_code != 200:
+                print(f"[!] Local Brain Error {response.status_code}: {response.text}")
+                return {
+                    "speech": "I'm having a connection issue with my local brain.",
+                    "command": None,
+                    "thought": f"Server Error {response.status_code}"
+                }
+                
             data = response.json()
             content = data['choices'][0]['message']['content']
 
-            # Record assistant response in history
+            self.history.append({"role": "user", "content": user_input})
             self.history.append({"role": "assistant", "content": content})
+            if len(self.history) > 8:
+                self.history = self.history[-8:]
 
-            # Attempt to parse JSON, if it fails, treat as plain speech
             try:
                 return json.loads(content)
-            except:
-                return {
-                    "speech": content,
-                    "command": None,
-                    "thought": "Model returned plain text instead of JSON."
-                }
+            except Exception:
+                return {"speech": content, "command": None, "thought": "Plain text response."}
         except Exception as e:
-            print(f"[!] Local Brain Error: {e}")
+            print(f"[!] Local Brain Connection Error: {e}")
             return {
                 "speech": "I'm having trouble thinking locally. The local model is taking too long to respond.",
                 "command": None,
-                "thought": f"Local LLM Error: {str(e)}"
+                "thought": f"Connection Error: {str(e)}"
             }
 
     async def _process_gemini(self, user_input: str):
-        """Handles inference via Google Gemini API using new SDK."""
+        """Handles inference via Google Gemini API with ultra-aggressive pacing."""
         if not self.gemini_ready:
             return {"speech": "Gemini not configured.", "command": None, "thought": "API key missing."}
             
-        try:
-            # Map history to new SDK format
-            contents = []
-            for h in self.history:
-                role = "user" if h["role"] == "user" else "model"
-                contents.append(types.Content(role=role, parts=[types.Part(text=h["content"])]))
-            
-            # Add current input
-            contents.append(types.Content(role="user", parts=[types.Part(text=user_input)]))
-
-            response = self.client.models.generate_content(
-                model=self.gemini_model_name,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=self.system_prompt,
-                    response_mime_type="application/json"
-                )
-            )
-            
-            result = json.loads(response.text)
-            
-            # Add to history
-            self.history.append({"role": "user", "content": user_input})
-            self.history.append({"role": "assistant", "content": response.text})
-            
-            return result
-        except Exception as e:
-            error_msg = str(e)
-            print(f"[!] Gemini Brain Error: {error_msg}")
-            
-            # Quota handling (429)
-            thought = f"Gemini API Error: {error_msg}"
-            if "429" in error_msg:
-                thought = "Gemini API Quota Exceeded (429)."
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                # 20 second delay to avoid free tier RPM limits during team turns
+                print(f"[*] Pacing Gemini (20s delay)... attempt {attempt+1}")
+                await asyncio.sleep(20)
                 
-            return {
-                "speech": "I've hit a slight cognitive snag with the cloud.",
-                "command": None,
-                "thought": thought
-            }
+                contents = []
+                for h in self.history:
+                    role = "user" if h["role"] == "user" else "model"
+                    contents.append(types.Content(role=role, parts=[types.Part(text=h["content"])]))
+                
+                contents.append(types.Content(role="user", parts=[types.Part(text=user_input)]))
+
+                response = self.client.models.generate_content(
+                    model=self.gemini_model_name,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=self.system_prompt,
+                        response_mime_type="application/json"
+                    )
+                )
+                
+                result = json.loads(response.text)
+                self.history.append({"role": "user", "content": user_input})
+                self.history.append({"role": "assistant", "content": response.text})
+                return result
+
+            except Exception as e:
+                error_msg = str(e)
+                print(f"[!] Gemini Attempt {attempt+1} failed: {error_msg}")
+                
+                if "429" in error_msg:
+                    if attempt < max_retries:
+                        print("[*] Quota hit. Sleeping 40s before retry...")
+                        await asyncio.sleep(40)
+                        continue
+                    else:
+                        thought = "Gemini API Quota Exceeded (429)."
+                else:
+                    thought = f"Gemini API Error: {error_msg}"
+                    
+                return {
+                    "speech": "I've hit a slight cognitive snag with the cloud.",
+                    "command": None,
+                    "thought": thought
+                }
+
+class BrainFactory:
+    @staticmethod
+    def create_brain():
+        return Brain()
 
 if __name__ == "__main__":
-    # Local test
     async def test():
         b = Brain()
-        result = await b.process_command("Check the current directory and list all files.")
+        result = await b.process_command("Hello")
         print(result)
     # asyncio.run(test())

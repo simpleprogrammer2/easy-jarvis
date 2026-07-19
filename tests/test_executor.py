@@ -1,4 +1,3 @@
-import pytest
 from src.executor import Executor
 
 def test_executor_basic_command():
