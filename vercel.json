@@ -15,11 +15,5 @@
       "src": "/(.*)",
       "dest": "src/main.py"
     }
-  ],
-  "functions": {
-    "src/main.py": {
-      "memory": 3009,
-      "maxDuration": 300
-    }
-  }
+  ]
 }
