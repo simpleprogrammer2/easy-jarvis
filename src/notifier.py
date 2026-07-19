@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Notifier:
     def __init__(self):
         self.enabled = os.getenv("EMAIL_NOTIFICATIONS", "False").lower() == "true"
@@ -26,14 +27,14 @@ class Notifier:
             return
 
         print(f"[*] Sending Emergency Alert to {self.recipient}...")
-        
+
         try:
             msg = MIMEMultipart()
-            msg['From'] = self.sender
-            msg['To'] = self.recipient
-            msg['Subject'] = f"🚨 JARVIS ALERT: {subject}"
+            msg["From"] = self.sender
+            msg["To"] = self.recipient
+            msg["Subject"] = f"🚨 JARVIS ALERT: {subject}"
 
-            msg.attach(MIMEText(message, 'plain'))
+            msg.attach(MIMEText(message, "plain"))
 
             server = smtplib.SMTP(self.smtp_server, self.smtp_port)
             server.starttls()
@@ -44,6 +45,7 @@ class Notifier:
             print("[+] Alert sent successfully.")
         except Exception as e:
             print(f"[!] Failed to send email: {e}")
+
 
 if __name__ == "__main__":
     # Test

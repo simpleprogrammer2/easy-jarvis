@@ -27,7 +27,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(current_dir, "templates"))
 
 # Mount static files
-app.mount("/static", StaticFiles(directory=os.path.join(current_dir, "static")), name="static")
+app.mount(
+    "/static", StaticFiles(directory=os.path.join(current_dir, "static")), name="static"
+)
 
 # --- API Endpoints ---
 
@@ -37,14 +39,11 @@ async def get_console(request: Request):
     logger.debug("Console requested.")
     # Check if we need a weight update for the "Swipe Sequence"
     needs_weight = matrix.needs_weight_update()
-    
+
     return templates.TemplateResponse(
-        request=request, 
-        name="console.html", 
-        context={
-            "status": "Online",
-            "needs_weight": needs_weight
-        }
+        request=request,
+        name="console.html",
+        context={"status": "Online", "needs_weight": needs_weight},
     )
 
 
@@ -75,7 +74,7 @@ async def log_habits_endpoint(payload: dict = Body(...)):
         no_phone=payload.get("no_phone", False),
         read_book=payload.get("read_book", False),
         exercise=payload.get("exercise", False),
-        meditation=payload.get("meditation", False)
+        meditation=payload.get("meditation", False),
     )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to log habits")
@@ -88,7 +87,7 @@ async def log_weight_endpoint(payload: dict = Body(...)):
     weight = payload.get("weight")
     if weight is None:
         raise HTTPException(status_code=400, detail="No weight provided")
-    
+
     success = matrix.log_weight(float(weight))
     if not success:
         raise HTTPException(status_code=500, detail="Failed to log weight")
