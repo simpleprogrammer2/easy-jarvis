@@ -4,11 +4,14 @@ from fastapi import FastAPI, Request, HTTPException, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+
+# --- Imports adjusted for new project structure ---
 from src.voice import Voice
-from src.brain import Brain
+from src.brain import BrainFactory
 from src.executor import Executor
 from src.core.config import setup_logging, SYSTEM_STATUS_ONLINE
 from src.core.matrix_manager import MatrixManager
+from src.modules.reminders import get_apple_reminders
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,7 +20,7 @@ logger = setup_logging("Main")
 app = FastAPI(title="easy-jarvis Console")
 
 # --- Globals (Managed via Factory where applicable) ---
-brain = Brain.create_brain()
+brain = BrainFactory.create_brain()
 executor = Executor()
 voice = Voice()
 matrix = MatrixManager()
@@ -92,6 +95,18 @@ async def log_weight_endpoint(payload: dict = Body(...)):
     if not success:
         raise HTTPException(status_code=500, detail="Failed to log weight")
     return {"status": "Weight Logged"}
+
+
+@app.get("/matrix/habits-history")
+async def get_habits_history_endpoint():
+    """Fetches the habit logs for the last 7 days."""
+    return matrix.get_habits_history(days=7)
+
+
+@app.get("/api/reminders")
+async def get_reminders_endpoint():
+    """Fetches active Apple Reminders."""
+    return {"reminders": get_apple_reminders()}
 
 
 @app.post("/execute")
